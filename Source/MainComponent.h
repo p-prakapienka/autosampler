@@ -10,9 +10,11 @@
 #include "Export/SFZExporter.h"
 #include "Export/SF2Exporter.h"
 #include "Export/DecentSamplerExporter.h"
+#include "Preview/SamplePreviewManager.h"
 
 class MainComponent : public juce::Component,
-                      private juce::AudioIODeviceCallback
+                      juce::AudioIODeviceCallback,
+                      juce::MidiKeyboardState::Listener
 {
 public:
     MainComponent();
@@ -37,6 +39,9 @@ private:
     void showAudioSettings();
     void exportSamples();
     void updateControlsEnabled();
+
+    void handleNoteOn(juce::MidiKeyboardState*, int midiChannel, int midiNoteNumber, float velocity) override;
+    void handleNoteOff(juce::MidiKeyboardState*, int midiChannel, int midiNoteNumber, float velocity) override;
 
     juce::AudioDeviceManager audioDeviceManager;
     MidiOutputManager midiOutputManager;
@@ -83,6 +88,11 @@ private:
     juce::Label statusLabel;
     double progress = 0.0;
     juce::ProgressBar progressBar { progress };
+
+    // Sample preview
+    juce::MidiKeyboardState keyboardState;
+    juce::MidiKeyboardComponent midiKeyboard { keyboardState, juce::MidiKeyboardComponent::horizontalKeyboard };
+    SamplePreviewManager previewManager;
 
     // Stored samples
     std::map<int, SampleData> capturedSamples;

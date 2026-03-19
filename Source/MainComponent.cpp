@@ -4,7 +4,7 @@ MainComponent::MainComponent()
     : samplerEngine(midiOutputManager, recordingManager)
 {
     // Audio device setup
-    auto result = audioDeviceManager.initialiseWithDefaultDevices(2, 0);
+    auto result = audioDeviceManager.initialiseWithDefaultDevices(2, 2);
     if (result.isNotEmpty())
     {
         DBG("Audio device init error: " + result);
@@ -123,6 +123,12 @@ MainComponent::MainComponent()
     addAndMakeVisible(progressBar);
     progress = 0.0;
 
+    // MIDI Keyboard for sample preview
+    midiKeyboard.setAvailableRange(36, 84); // C2 to C6
+    midiKeyboard.setEnabled(false);
+    addAndMakeVisible(midiKeyboard);
+    keyboardState.addListener(this);
+
     // Sampler Engine callbacks
     samplerEngine.setStatusCallback([this](const juce::String& status, int completed, int total) {
         juce::MessageManager::callAsync([this, status, completed, total] {
@@ -135,16 +141,18 @@ MainComponent::MainComponent()
     samplerEngine.setCompletionCallback([this](const std::map<int, SampleData>& samples) {
         juce::MessageManager::callAsync([this, samples] {
             capturedSamples = samples;
+            previewManager.setSamples(&capturedSamples);
             progress = 1.0;
             updateControlsEnabled();
         });
     });
 
-    setSize(500, 700);
+    setSize(500, 830);
 }
 
 MainComponent::~MainComponent()
 {
+    keyboardState.removeListener(this);
     audioDeviceManager.removeAudioCallback(this);
     samplerEngine.stopSampling();
 }
@@ -246,6 +254,10 @@ void MainComponent::resized()
 
     // Export status
     exportStatusLabel.setBounds(area.removeFromTop(rowHeight));
+    area.removeFromTop(spacing);
+
+    // MIDI Keyboard at bottom
+    midiKeyboard.setBounds(area.removeFromBottom(120));
 }
 
 void MainComponent::audioDeviceIOCallbackWithContext(
@@ -258,10 +270,13 @@ void MainComponent::audioDeviceIOCallbackWithContext(
 {
     recordingManager.recordBlock(inputChannelData, numInputChannels, numSamples);
 
-    // Silence output
+    // Clear output first
     for (int ch = 0; ch < numOutputChannels; ++ch)
         if (outputChannelData[ch] != nullptr)
             juce::FloatVectorOperations::clear(outputChannelData[ch], numSamples);
+
+    // Mix preview playback into output
+    previewManager.processBlock(outputChannelData, numOutputChannels, numSamples);
 }
 
 void MainComponent::audioDeviceAboutToStart(juce::AudioIODevice* device)
@@ -272,6 +287,7 @@ void MainComponent::audioDeviceAboutToStart(juce::AudioIODevice* device)
             device->getCurrentSampleRate(),
             device->getActiveInputChannels().countNumberOfSetBits(),
             10.5);
+        previewManager.setSampleRate(device->getCurrentSampleRate());
     }
 }
 
@@ -341,7 +357,16 @@ void MainComponent::stopSampling()
 void MainComponent::showAudioSettings()
 {
     auto* selector = new juce::AudioDeviceSelectorComponent(
-        audioDeviceManager, 1, 2, 0, 0, false, false, true, false);
+        audioDeviceManager,
+        1,
+        2,
+        1,
+        2,
+        false,
+        false,
+        true,
+        false
+    );
     selector->setSize(500, 300);
 
     juce::DialogWindow::LaunchOptions options;
@@ -426,4 +451,15 @@ void MainComponent::updateControlsEnabled()
     runButton.setEnabled(!isSampling);
     stopButton.setEnabled(isSampling);
     exportButton.setEnabled(!isSampling && !capturedSamples.empty());
+    midiKeyboard.setEnabled(!isSampling && !capturedSamples.empty());
+}
+
+void MainComponent::handleNoteOn(juce::MidiKeyboardState*, int /*midiChannel*/, int midiNoteNumber, float /*velocity*/)
+{
+    previewManager.noteOn(midiNoteNumber);
+}
+
+void MainComponent::handleNoteOff(juce::MidiKeyboardState*, int /*midiChannel*/, int midiNoteNumber, float /*velocity*/)
+{
+    previewManager.noteOff(midiNoteNumber);
 }

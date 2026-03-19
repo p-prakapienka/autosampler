@@ -9,7 +9,7 @@ public:
 
     const juce::String getApplicationName() override    { return JUCE_APPLICATION_NAME_STRING; }
     const juce::String getApplicationVersion() override { return JUCE_APPLICATION_VERSION_STRING; }
-    bool moreThanOneInstanceAllowed() override           { return false; }
+    bool moreThanOneInstanceAllowed() override          { return false; }
 
     void initialise(const juce::String&) override
     {
