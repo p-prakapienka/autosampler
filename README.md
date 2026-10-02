@@ -20,6 +20,18 @@ cmake --build build
 
 The target is `JuceAutosampler` (product name "JUCE Autosampler").
 
+## Download a build
+
+Pushes to `main` (and manual runs) build a Windows x64 app. Open the latest green run of [Build](https://github.com/p-prakapienka/autosampler/actions/workflows/build.yml) and download `autosampler-windows-x64`.
+
+GitHub wraps the artifact in a zip. Unzip that, then unpack the `.tar.gz` inside:
+
+```bash
+tar -xzf autosampler-windows-x64.tar.gz
+```
+
+Run `JUCE Autosampler.exe`. If Windows reports a missing DLL, install the latest Microsoft Visual C++ Redistributable (x64).
+
 ## Status
 
 v1 works. Decisions, UI, and naming conventions: [docs/reader.md](docs/reader.md).
