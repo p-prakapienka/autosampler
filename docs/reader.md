@@ -15,7 +15,8 @@ A standalone JUCE desktop application that automatically samples a hardware or s
 
 - v1 is built and working. It was implemented from [original-development-plan.md](original-development-plan.md).
 - The codebase is the source of truth. That plan is historical and contains some plugin-era naming that may not match the code.
-- Next feature: Sample Preview with a 49-key virtual MIDI keyboard. Plan: [plans/001-sample-preview.md](plans/001-sample-preview.md).
+- Sample preview is in the code (keyboard, 8 voices). Its plan checklist is still open: [plans/001-sample-preview.md](plans/001-sample-preview.md).
+- Next feature: adjustable sample start and attack. Plan: [plans/002-sample-start-and-attack.md](plans/002-sample-start-and-attack.md).
 
 ## v1 UI controls
 

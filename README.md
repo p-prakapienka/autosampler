@@ -36,7 +36,7 @@ Run `JUCE Autosampler.exe`. If Windows reports a missing DLL, install the latest
 
 v1 works. Decisions, UI, and naming conventions: [docs/reader.md](docs/reader.md).
 
-Next feature: [docs/plans/001-sample-preview.md](docs/plans/001-sample-preview.md) (sample preview).
+Next feature: [docs/plans/002-sample-start-and-attack.md](docs/plans/002-sample-start-and-attack.md) (adjustable sample start and attack).
 
 ## Docs
 
