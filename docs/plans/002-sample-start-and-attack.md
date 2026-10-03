@@ -27,10 +27,11 @@ This replaces a destructive "trim silence" step.
    - The control shows both numbers when they differ, e.g. `Start 50 ms (auto 38 ms)`.
 
 4. **Detection**
-   - Per note, peak = max absolute sample across channels.
+   - Per note, peak = `AudioBuffer::getMagnitude` across the whole buffer.
    - If peak < 1.0e-4, onset is sample 0 (nothing useful in the take).
    - Otherwise threshold = peak * 0.01 (-40 dB relative to that note's peak).
    - Onset = first sample where any channel stays at or above the threshold for 1 ms. This ignores a single spike.
+   - The scan is `juce::AudioFormatReader::searchForLevel`, not a hand-written sample loop. See `StartDetector` below.
    - Convert each onset to milliseconds. Automatic start = median of `max(0, onsetMs - attackMs)`.
    - Runs on the message thread when sampling completes. Not on the audio thread.
 
@@ -94,6 +95,22 @@ public:
 ```
 
 `MainComponent` owns the two slider values in milliseconds and one `StartDetector`. Detection runs with the current attack. Called from the sampling-complete path, after `capturedSamples` is filled and before preview is enabled.
+
+`searchForLevel` lives on `AudioFormatReader`, and the take is an `AudioBuffer<float>`. JUCE has no buffer overload. `StartDetector.cpp` keeps a private `AudioFormatReader` subclass whose only job is `readSamples` from that buffer. `usesFloatingPointData` is true, so `readSamples` writes floats into the `int*` destinations (`searchForLevel` reads them back as floats). The reader holds no stream and does not touch disk.
+
+`findOnsetSample` then:
+
+1. Returns 0 when the buffer is empty, has no channels, or the sample rate is not positive.
+2. Reads the peak with `getMagnitude`. Below 1.0e-4, returns 0.
+3. Calls `searchForLevel(0, numSamples, threshold, largeMax, holdSamples)`.
+   - `threshold` is `peak * 0.01`.
+   - `largeMax` is far above 0 dBFS. The float path compares the raw sample, and a take can exceed 1.0. A max of 1.0 would skip those peaks. The documented 0..1 range does not apply here.
+   - `holdSamples` is 1 ms at the note's sample rate, at least 1.
+4. Returns 0 when `searchForLevel` returns -1. Otherwise returns that index.
+
+`searchForLevel` returns the first sample of the run, and it matches if any channel is inside the range. That is the same result as the current loop. The median across notes and the attack pre-roll stay in `detectStartMs`.
+
+No new public type. No aubio. The -40 dB and 1 ms constants stay fixed.
 
 ### Preview
 
