@@ -89,21 +89,9 @@ void SamplerEngine::timerCallback()
         case NotePhase::SendingNoteOff:
         {
             midiOutputManager.sendNoteOff(midiChannel, currentNote);
-            if (releaseDuration <= 0.0) {
-                recordingManager.stopRecording();
-                currentPhase = NotePhase::Storing;
-            } else {
-                releaseElapsed = 0.0;
-                currentPhase = NotePhase::Releasing;
-
-                if (statusCallback) {
-                    auto noteName = getMidiNoteDisplayName(currentNote);
-                    auto status = "Releasing " + noteName + " (" +
-                                  juce::String(currentNote) + ")";
-                    statusCallback(status, currentNote - startNote, endNote - startNote + 1);
-                }
-            }
-            break;
+            releaseElapsed = 0.0;
+            currentPhase = NotePhase::Releasing;
+            [[fallthrough]];
         }
 
         case NotePhase::Releasing:
@@ -112,6 +100,14 @@ void SamplerEngine::timerCallback()
             if (releaseElapsed >= releaseDuration) {
                 recordingManager.stopRecording();
                 currentPhase = NotePhase::Storing;
+                break;
+            }
+
+            if (statusCallback && releaseElapsed <= timerIntervalMs / 1000.0) {
+                auto noteName = getMidiNoteDisplayName(currentNote);
+                auto status = "Releasing " + noteName + " (" +
+                              juce::String(currentNote) + ")";
+                statusCallback(status, currentNote - startNote, endNote - startNote + 1);
             }
             break;
         }

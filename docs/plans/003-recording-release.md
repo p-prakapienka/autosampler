@@ -19,8 +19,7 @@ After the existing note length, send Note Off and keep recording for a Release t
 2. **Timeline per note**
    - Note On and start recording.
    - Hold until the note length. Note On to Note Off does not move.
-   - Note Off. If release is 0, stop the recorder on that same tick (today's behavior).
-   - Otherwise keep recording until the release time has elapsed, then stop.
+   - Note Off, then the release phase. The release clock starts at 0 and this same tick is its first interval. If that is already at or past the release time, including a release of 0, the phase stops the recorder and goes to Storing. There is no separate zero-release path.
    - Store the buffer and advance. The next Note On happens only after the recorder has stopped.
 
 3. **What is stored**
@@ -39,7 +38,7 @@ After the existing note length, send Note Off and keep recording for a Release t
 
 Anything still sounding after the release time can still leak into the next note. There is no extra gap and no auto-stop on silence. Set Release at least as long as the source decay.
 
-The engine stays a 50 ms message-thread timer. One phase per tick. Recorded release is the slider value, within one timer interval, same accuracy as note length.
+The engine stays a 50 ms message-thread timer. Recorded release is the slider value, within one timer interval, same accuracy as note length. Note Off runs the release phase on that same tick, so a release of 0 stores without waiting for another tick.
 
 ---
 
@@ -61,13 +60,12 @@ Release (s):  [====●----------]  1.0
 
 ```text
 SendingNoteOn → Recording → SendingNoteOff → Releasing → Storing → next note
-                                      └─ release 0 → Storing
 ```
 
 - `SendingNoteOn` allocates `noteDuration + releaseDuration + 0.5` and sends Note On, as today.
 - `Recording` waits for the note length, then moves to `SendingNoteOff`. Note Off is still the next tick.
-- `SendingNoteOff` sends Note Off. Release 0 stops the recorder and goes to `Storing`. Otherwise it zeros the release clock, reports Releasing, and goes to `Releasing`.
-- `Releasing` adds one timer interval per tick. At or past the release time it stops the recorder and goes to `Storing`.
+- `SendingNoteOff` sends Note Off, zeros the release clock, and enters `Releasing` immediately.
+- `Releasing` adds one timer interval. At or past the release time it stops the recorder and goes to `Storing`. A release of 0 takes that path on the Note Off tick.
 - `Storing` is unchanged.
 
 `startSampling` takes `releaseDuration` after the note length. `AutosamplerState::releaseDuration` defaults to 1.0. `MainComponent` passes the slider value.
@@ -78,7 +76,7 @@ No change to `RecordingManager`, exporters, `StartDetector`, or preview.
 
 ## Testing criteria
 
-- [ ] Release 0: Note Off and stop on the same tick. Take length matches a build without this control.
+- [ ] Release 0: the release phase stores on the Note Off tick. No extra branch.
 - [ ] Release 1 s, duration 3 s: Note Off around 3 s, recorder stops around 4 s, next Note On only after that.
 - [ ] The stored buffer contains the decay. The next note does not, if the source has gone quiet.
 - [ ] Status shows Releasing, then Recording for the next note.
@@ -100,3 +98,4 @@ No change to `RecordingManager`, exporters, `StartDetector`, or preview.
 
 - Duration and the other sampling controls stay enabled during a run. Release matches them. The value is copied in `startSampling` and not read again.
 - Window height goes from 920 to 958.
+- Note Off always falls through into `Releasing`. The status line is posted only on the first release interval, and only if that interval has not already finished the release.
