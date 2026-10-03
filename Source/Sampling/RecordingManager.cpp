@@ -35,7 +35,7 @@ void RecordingManager::recordBlock(const float* const* inputChannelData, int num
     }
 
     int channelsToWrite = juce::jmin(numChannels, buffer.getNumChannels());
-    for (int ch = 0; ch < channelsToWrite; ++ch) {
+    for (int ch = 0; ch < channelsToWrite; ch++) {
         if (inputChannelData[ch] != nullptr) {
             buffer.copyFrom(ch, pos, inputChannelData[ch], samplesToWrite);
         }
@@ -52,7 +52,7 @@ juce::AudioBuffer<float> RecordingManager::getRecordedBuffer() const
     }
 
     juce::AudioBuffer<float> result(buffer.getNumChannels(), numSamples);
-    for (int ch = 0; ch < buffer.getNumChannels(); ++ch) {
+    for (int ch = 0; ch < buffer.getNumChannels(); ch++) {
         result.copyFrom(ch, 0, buffer, ch, 0, numSamples);
     }
 

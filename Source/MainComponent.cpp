@@ -63,7 +63,7 @@ MainComponent::MainComponent()
     // MIDI Channel
     midiChannelLabel.setText("MIDI Channel:", juce::dontSendNotification);
     addAndMakeVisible(midiChannelLabel);
-    for (int i = 1; i <= 16; ++i) {
+    for (int i = 1; i <= 16; i++) {
         midiChannelCombo.addItem("Ch " + juce::String(i), i);
     }
     midiChannelCombo.setSelectedId(1);
@@ -271,7 +271,7 @@ void MainComponent::audioDeviceIOCallbackWithContext(
     recordingManager.recordBlock(inputChannelData, numInputChannels, numSamples);
 
     // Clear output first
-    for (int ch = 0; ch < numOutputChannels; ++ch) {
+    for (int ch = 0; ch < numOutputChannels; ch++) {
         if (outputChannelData[ch] != nullptr) {
             juce::FloatVectorOperations::clear(outputChannelData[ch], numSamples);
         }
@@ -301,7 +301,7 @@ void MainComponent::refreshMidiDevices()
 {
     midiOutputCombo.clear();
     auto devices = midiOutputManager.getAvailableDevices();
-    for (int i = 0; i < devices.size(); ++i) {
+    for (int i = 0; i < devices.size(); i++) {
         midiOutputCombo.addItem(devices[i], i + 1);
     }
 

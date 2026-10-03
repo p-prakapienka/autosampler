@@ -36,7 +36,7 @@ public:
         int sourceChannels = sourceBuffer->getNumChannels();
         int sourceSamples = sourceBuffer->getNumSamples();
 
-        for (int i = 0; i < numSamples; ++i) {
+        for (int i = 0; i < numSamples; i++) {
             if (readPosition >= sourceSamples) {
                 playing.store(false);
                 return;
@@ -57,7 +57,7 @@ public:
                 }
             }
 
-            for (int ch = 0; ch < numOutputChannels; ++ch) {
+            for (int ch = 0; ch < numOutputChannels; ch++) {
                 int srcCh = juce::jmin(ch, sourceChannels - 1);
                 outputChannelData[ch][i] += sourceBuffer->getSample(srcCh, readPosition) * gain;
             }

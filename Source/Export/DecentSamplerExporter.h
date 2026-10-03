@@ -104,7 +104,7 @@ private:
         group->setAttribute("ampVelTrack", 1.0);
         group->setAttribute("name", packName);
 
-        for (int i = 0; i < numSamples; ++i) {
+        for (int i = 0; i < numSamples; i++) {
             int midiNote = midiNotes[(size_t) i];
 
             // Calculate key range

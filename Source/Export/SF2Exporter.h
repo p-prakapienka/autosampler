@@ -136,7 +136,7 @@ private:
         auto utf8 = str.toUTF8();
         int len = juce::jmin((int) strlen(utf8), maxLen - 1);
         out.write(utf8, (size_t) len);
-        for (int i = len; i < maxLen; ++i) {
+        for (int i = len; i < maxLen; i++) {
             out.writeByte(0);
         }
     }
@@ -188,7 +188,7 @@ private:
 
             // Write mono (use first channel only for SF2)
             const float* channelData = data.audioBuffer.getReadPointer(0);
-            for (int i = 0; i < numSamples; ++i) {
+            for (int i = 0; i < numSamples; i++) {
                 float sample = juce::jlimit(-1.0f, 1.0f, channelData[i]);
                 int16_t pcm = static_cast<int16_t>(sample * 32767.0f);
                 writeInt16LE(out, pcm);
@@ -198,7 +198,7 @@ private:
             endOffsets.push_back(currentOffset);
 
             // Write 46 zero padding samples (required by SF2 spec)
-            for (int i = 0; i < SF2_SAMPLE_PADDING; ++i) {
+            for (int i = 0; i < SF2_SAMPLE_PADDING; i++) {
                 writeInt16LE(out, 0);
             }
 
@@ -228,7 +228,7 @@ private:
         }
 
         std::vector<int> lokeys(numSamples), hikeys(numSamples);
-        for (int i = 0; i < numSamples; ++i) {
+        for (int i = 0; i < numSamples; i++) {
             if (i == 0) {
                 lokeys[i] = midiNotes[i];
             } else {
@@ -288,7 +288,7 @@ private:
         // Terminal only = 10 bytes
         {
             writeChunkHeader(out, "pmod", 10);
-            for (int i = 0; i < 10; ++i) {
+            for (int i = 0; i < 10; i++) {
                 out.writeByte(0);
             }
         }
@@ -332,7 +332,7 @@ private:
             uint32_t ibagSize = 4 * ((uint32_t) numSamples + 1);
             writeChunkHeader(out, "ibag", ibagSize);
 
-            for (int i = 0; i < numSamples; ++i) {
+            for (int i = 0; i < numSamples; i++) {
                 // Each bag uses 4 generators: keyRange, overridingRootKey, sampleModes, sampleID
                 writeUint16LE(out, (uint16_t) (i * 4)); // wInstGenNdx
                 writeUint16LE(out, 0);                    // wInstModNdx
@@ -347,7 +347,7 @@ private:
         // Terminal only = 10 bytes
         {
             writeChunkHeader(out, "imod", 10);
-            for (int i = 0; i < 10; ++i) {
+            for (int i = 0; i < 10; i++) {
                 out.writeByte(0);
             }
         }
@@ -359,7 +359,7 @@ private:
             uint32_t igenSize = 4 * ((uint32_t) numSamples * 4 + 1);
             writeChunkHeader(out, "igen", igenSize);
 
-            for (int i = 0; i < numSamples; ++i) {
+            for (int i = 0; i < numSamples; i++) {
                 // keyRange (genOper=43)
                 writeUint16LE(out, 43);
                 writeInt8(out, (int8_t) lokeys[i]);   // lo
@@ -390,7 +390,7 @@ private:
             uint32_t shdrSize = 46 * ((uint32_t) numSamples + 1);
             writeChunkHeader(out, "shdr", shdrSize);
 
-            for (int i = 0; i < numSamples; ++i) {
+            for (int i = 0; i < numSamples; i++) {
                 juce::String sampleName = getMidiNoteName(midiNotes[i]);
                 writeFixedString(out, sampleName, 20);
 
