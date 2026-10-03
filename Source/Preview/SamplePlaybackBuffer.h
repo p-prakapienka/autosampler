@@ -20,46 +20,44 @@ public:
 
     void stopPlayback()
     {
-        if (playing.load())
+        if (playing.load()) {
             fadingOut = true;
+        }
     }
 
     bool isPlaying() const { return playing.load(); }
 
     void readBlock(float* const* outputChannelData, int numOutputChannels, int numSamples)
     {
-        if (!playing.load() || sourceBuffer == nullptr)
+        if (!playing.load() || sourceBuffer == nullptr) {
             return;
+        }
 
         int sourceChannels = sourceBuffer->getNumChannels();
         int sourceSamples = sourceBuffer->getNumSamples();
 
-        for (int i = 0; i < numSamples; ++i)
-        {
-            if (readPosition >= sourceSamples)
-            {
+        for (int i = 0; i < numSamples; i++) {
+            if (readPosition >= sourceSamples) {
                 playing.store(false);
                 return;
             }
 
             float gain = 1.0f;
-            if (fadingOut)
-            {
+            if (fadingOut) {
                 gain = fadeGain;
-                if (fadeOutSamples > 0)
+                if (fadeOutSamples > 0) {
                     fadeGain -= 1.0f / static_cast<float>(fadeOutSamples);
-                else
+                } else {
                     fadeGain = 0.0f;
+                }
 
-                if (fadeGain <= 0.0f)
-                {
+                if (fadeGain <= 0.0f) {
                     playing.store(false);
                     return;
                 }
             }
 
-            for (int ch = 0; ch < numOutputChannels; ++ch)
-            {
+            for (int ch = 0; ch < numOutputChannels; ch++) {
                 int srcCh = juce::jmin(ch, sourceChannels - 1);
                 outputChannelData[ch][i] += sourceBuffer->getSample(srcCh, readPosition) * gain;
             }

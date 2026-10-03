@@ -10,8 +10,9 @@ public:
     {
         juce::WavAudioFormat format;
         auto outputStream = outputFile.createOutputStream();
-        if (outputStream == nullptr)
+        if (outputStream == nullptr) {
             return false;
+        }
 
         std::unique_ptr<juce::AudioFormatWriter> writer(
             format.createWriterFor(outputStream.release(),
@@ -21,8 +22,9 @@ public:
                                    {},
                                    0));
 
-        if (writer == nullptr)
+        if (writer == nullptr) {
             return false;
+        }
 
         return writer->writeFromAudioSampleBuffer(data.audioBuffer, 0,
                                                    data.audioBuffer.getNumSamples());

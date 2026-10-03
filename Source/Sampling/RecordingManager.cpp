@@ -23,20 +23,22 @@ void RecordingManager::stopRecording()
 
 void RecordingManager::recordBlock(const float* const* inputChannelData, int numChannels, int numSamples)
 {
-    if (!recording.load())
+    if (!recording.load()) {
         return;
+    }
 
     int pos = writePosition.load();
     int samplesToWrite = juce::jmin(numSamples, maxSamples - pos);
 
-    if (samplesToWrite <= 0)
+    if (samplesToWrite <= 0) {
         return;
+    }
 
     int channelsToWrite = juce::jmin(numChannels, buffer.getNumChannels());
-    for (int ch = 0; ch < channelsToWrite; ++ch)
-    {
-        if (inputChannelData[ch] != nullptr)
+    for (int ch = 0; ch < channelsToWrite; ch++) {
+        if (inputChannelData[ch] != nullptr) {
             buffer.copyFrom(ch, pos, inputChannelData[ch], samplesToWrite);
+        }
     }
 
     writePosition.store(pos + samplesToWrite);
@@ -45,12 +47,14 @@ void RecordingManager::recordBlock(const float* const* inputChannelData, int num
 juce::AudioBuffer<float> RecordingManager::getRecordedBuffer() const
 {
     int numSamples = writePosition.load();
-    if (numSamples <= 0)
+    if (numSamples <= 0) {
         return {};
+    }
 
     juce::AudioBuffer<float> result(buffer.getNumChannels(), numSamples);
-    for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
+    for (int ch = 0; ch < buffer.getNumChannels(); ch++) {
         result.copyFrom(ch, 0, buffer, ch, 0, numSamples);
+    }
 
     return result;
 }
