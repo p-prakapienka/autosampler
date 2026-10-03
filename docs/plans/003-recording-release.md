@@ -18,8 +18,8 @@ After the existing note length, send Note Off and keep recording for a Release t
 
 2. **Timeline per note**
    - Note On and start recording.
-   - Hold until the note length. Note On to Note Off does not move.
-   - Note Off, then the release phase. The release clock starts at 0 and this same tick is its first interval. If that is already at or past the release time, including a release of 0, the phase stops the recorder and goes to Storing. There is no separate zero-release path.
+   - Hold until the note length. The tick that reaches it sends Note Off. There is no separate Note Off phase.
+   - That same tick enters the release phase. The release clock starts at 0 and this tick is its first interval. If that is already at or past the release time, including a release of 0, the phase stops the recorder and goes to Storing.
    - Store the buffer and advance. The next Note On happens only after the recorder has stopped.
 
 3. **What is stored**
@@ -38,7 +38,7 @@ After the existing note length, send Note Off and keep recording for a Release t
 
 Anything still sounding after the release time can still leak into the next note. There is no extra gap and no auto-stop on silence. Set Release at least as long as the source decay.
 
-The engine stays a 50 ms message-thread timer. Recorded release is the slider value, within one timer interval, same accuracy as note length. Note Off runs the release phase on that same tick, so a release of 0 stores without waiting for another tick.
+The engine stays a 50 ms message-thread timer. Recorded release is the slider value, within one timer interval, same accuracy as note length. The tick that reaches the note length sends Note Off and runs the release phase, so a release of 0 stores without waiting for another tick.
 
 ---
 
@@ -59,12 +59,11 @@ Release (s):  [====●----------]  1.0
 `SamplerEngine` gains a `Releasing` phase.
 
 ```text
-SendingNoteOn → Recording → SendingNoteOff → Releasing → Storing → next note
+SendingNoteOn → Recording → Releasing → Storing → next note
 ```
 
 - `SendingNoteOn` allocates `noteDuration + releaseDuration + 0.5` and sends Note On, as today.
-- `Recording` waits for the note length, then moves to `SendingNoteOff`. Note Off is still the next tick.
-- `SendingNoteOff` sends Note Off, zeros the release clock, and enters `Releasing` immediately.
+- `Recording` waits for the note length. The tick that reaches it sends Note Off and enters `Releasing`.
 - `Releasing` adds one timer interval. At or past the release time it stops the recorder and goes to `Storing`. A release of 0 takes that path on the Note Off tick.
 - `Storing` is unchanged.
 
@@ -98,4 +97,4 @@ No change to `RecordingManager`, exporters, `StartDetector`, or preview.
 
 - Duration and the other sampling controls stay enabled during a run. Release matches them. The value is copied in `startSampling` and not read again.
 - Window height goes from 920 to 958.
-- Note Off always falls through into `Releasing`. The status line is posted only on the first release interval, and only if that interval has not already finished the release.
+- Note Off is sent from `Recording` when the note length is reached, then that tick falls through into `Releasing`. There is no `SendingNoteOff` phase. The status line is posted only on the first release interval, and only if that interval has not already finished the release.

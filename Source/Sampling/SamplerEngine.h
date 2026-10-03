@@ -43,7 +43,7 @@ private:
     int midiChannel = 1;
     int velocity = 100;
 
-    enum class NotePhase { SendingNoteOn, Recording, SendingNoteOff, Releasing, Storing };
+    enum class NotePhase { SendingNoteOn, Recording, Releasing, Storing };
     NotePhase currentPhase = NotePhase::SendingNoteOn;
     double recordingElapsed = 0.0;
     double releaseElapsed = 0.0;
