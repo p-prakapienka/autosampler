@@ -18,8 +18,8 @@ After the existing note length, send Note Off and keep recording for a Release t
 
 2. **Timeline per note**
    - Note On and start recording.
-   - Hold until the note length. The tick that reaches it sends Note Off. There is no separate Note Off phase.
-   - That same tick enters the release phase. The release clock starts at 0 and this tick is its first interval. If that is already at or past the release time, including a release of 0, the phase stops the recorder and goes to Storing.
+   - Hold until the note length. The tick that reaches it sends Note Off and moves to the release phase. There is no separate Note Off phase.
+   - The next tick is the release phase. It adds one timer interval, then stops the recorder and goes to Storing if the release time is already reached, including a release of 0.
    - Store the buffer and advance. The next Note On happens only after the recorder has stopped.
 
 3. **What is stored**
@@ -38,7 +38,7 @@ After the existing note length, send Note Off and keep recording for a Release t
 
 Anything still sounding after the release time can still leak into the next note. There is no extra gap and no auto-stop on silence. Set Release at least as long as the source decay.
 
-The engine stays a 50 ms message-thread timer. Recorded release is the slider value, within one timer interval, same accuracy as note length. The tick that reaches the note length sends Note Off and runs the release phase, so a release of 0 stores without waiting for another tick.
+The engine stays a 50 ms message-thread timer. One phase per tick. Recorded release is the slider value, within one timer interval, same accuracy as note length. A release of 0 stops on the tick after Note Off.
 
 ---
 
@@ -63,8 +63,8 @@ SendingNoteOn → Recording → Releasing → Storing → next note
 ```
 
 - `SendingNoteOn` allocates `noteDuration + releaseDuration + 0.5` and sends Note On, as today.
-- `Recording` waits for the note length. The tick that reaches it sends Note Off and enters `Releasing`.
-- `Releasing` adds one timer interval. At or past the release time it stops the recorder and goes to `Storing`. A release of 0 takes that path on the Note Off tick.
+- `Recording` waits for the note length. The tick that reaches it sends Note Off and moves to `Releasing`. It does not run the release phase on that same tick.
+- `Releasing` adds one timer interval per tick. At or past the release time it stops the recorder and goes to `Storing`. A release of 0 takes that path on the tick after Note Off.
 - `Storing` is unchanged.
 
 `startSampling` takes `releaseDuration` after the note length. `AutosamplerState::releaseDuration` defaults to 1.0. `MainComponent` passes the slider value.
@@ -75,7 +75,7 @@ No change to `RecordingManager`, exporters, `StartDetector`, or preview.
 
 ## Testing criteria
 
-- [ ] Release 0: the release phase stores on the Note Off tick. No extra branch.
+- [ ] Release 0: Note Off, then the next tick stores. No separate Note Off phase and no zero-release branch.
 - [ ] Release 1 s, duration 3 s: Note Off around 3 s, recorder stops around 4 s, next Note On only after that.
 - [ ] The stored buffer contains the decay. The next note does not, if the source has gone quiet.
 - [ ] Status shows Releasing, then Recording for the next note.
@@ -97,4 +97,4 @@ No change to `RecordingManager`, exporters, `StartDetector`, or preview.
 
 - Duration and the other sampling controls stay enabled during a run. Release matches them. The value is copied in `startSampling` and not read again.
 - Window height goes from 920 to 958.
-- Note Off is sent from `Recording` when the note length is reached, then that tick falls through into `Releasing`. There is no `SendingNoteOff` phase. The status line is posted only on the first release interval, and only if that interval has not already finished the release.
+- Note Off is sent from `Recording` when the note length is reached, and the phase changes to `Releasing` without running it on that tick. There is no `SendingNoteOff` phase and no fallthrough. The status line is posted only on the first release interval, and only if that interval has not already finished the release.

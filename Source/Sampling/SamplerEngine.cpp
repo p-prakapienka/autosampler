@@ -80,14 +80,12 @@ void SamplerEngine::timerCallback()
         case NotePhase::Recording:
         {
             recordingElapsed += timerIntervalMs / 1000.0;
-            if (recordingElapsed < noteDuration) {
-                break;
+            if (recordingElapsed >= noteDuration) {
+                midiOutputManager.sendNoteOff(midiChannel, currentNote);
+                releaseElapsed = 0.0;
+                currentPhase = NotePhase::Releasing;
             }
-
-            midiOutputManager.sendNoteOff(midiChannel, currentNote);
-            releaseElapsed = 0.0;
-            currentPhase = NotePhase::Releasing;
-            [[fallthrough]];
+            break;
         }
 
         case NotePhase::Releasing:
