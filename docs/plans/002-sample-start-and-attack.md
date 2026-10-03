@@ -31,24 +31,24 @@ This replaces a destructive "trim silence" step.
    - If peak < 1.0e-4, onset is sample 0 (nothing useful in the take).
    - Otherwise threshold = peak * 0.01 (-40 dB relative to that note's peak).
    - Onset = first sample where any channel stays at or above the threshold for 1 ms. This ignores a single spike.
-   - Convert each onset to milliseconds. Automatic start = median of `max(0, onsetMs - defaultAttackMs)`.
+   - Convert each onset to milliseconds. Automatic start = median of `max(0, onsetMs - attackMs)`.
    - Runs on the message thread when sampling completes. Not on the audio thread.
 
 5. **Attack**
    - A single Attack slider, in milliseconds, shared by every note.
    - Range: 0 to 50 ms. Step: 1 ms. Default: 5 ms.
-   - From the start point, gain ramps linearly from 0 to 1 over the attack length.
-   - 0 ms means no ramp (a click is possible if the start sample is not near zero; that is the user's choice).
-   - If the remaining audio is shorter than the attack, the ramp is shortened to fit. It always reaches 1 at the end of the ramp.
+   - Use `juce::ADSR`. Attack is the slider. Decay is 0. Sustain is 1.
+   - 0 ms skips the attack. JUCE jumps straight to sustain.
+   - If the remaining audio is shorter than the attack, playback ends while the envelope is still rising. The attack is not compressed to fit, and the gain does not exceed 1.
 
 6. **Preview**
    - Playback starts at the start point, not at sample 0 of the raw buffer.
-   - The same linear ramp is applied.
+   - The same `juce::ADSR` attack is applied. Note-off is the ADSR release, 50 ms, which replaces the old hand-rolled fade.
    - Moving a slider does not restart a note that is already playing. The new values apply on the next note-on.
-   - No allocation and no locking on the audio thread for these parameters. Publish start and attack sample counts with atomics; the voice reads them when a note starts.
+   - The playback voice stores the sample counts. The preview manager does not.
 
 7. **Export**
-   - On export, build a processed copy of each `SampleData`: drop samples before the start point, apply the attack ramp to the head, leave the rest unchanged.
+   - On export, build a processed copy of each `SampleData`: drop samples before the start point, run `juce::ADSR` over the copy with the same attack and with release 0, so the file tail is not faded.
    - Pass that copy to the existing SFZ, SF2, and Decent Sampler exporters. Do not modify `capturedSamples`.
    - Do not rely on format-specific offset or envelope opcodes (`offset` / `ampeg_attack`, Decent Sampler `start` / `attack`, SF2 `startAddrsOffset` / `attackVolEnv`). Baked audio is the only way preview, SFZ, SF2, and Decent Sampler stay the same. SF2 already takes channel 0 of the buffer; the copy keeps the original channel count so SFZ and Decent Sampler stay stereo.
    - Exporting again after moving a slider rewrites the files. No re-record.
@@ -74,54 +74,47 @@ Attack  [==●----------]   5 ms
 
 Map names onto the current desktop app (`SamplerEngine`, `SampleData`, `SamplePlaybackBuffer`, `MainComponent`). This is not a plugin.
 
-### New: onset detection
+### `SampleEdit`
 
-A free function or small helper, message thread only:
-
-```cpp
-// Returns the automatic start in milliseconds for this set of takes.
-double detectStartMs(const std::map<int, SampleData>& samples, double attackMs);
-```
-
-Called from the sampling-complete path in `MainComponent`, after `capturedSamples` is filled and before preview is enabled.
-
-### New: render helper
-
-Message thread only. Used by export, and by any non-realtime check. Preview does not use this copy; it reads the raw buffer at an offset.
+One class owns the edit for the current run: start and attack in milliseconds, onset detection, and the export copy. The envelope is `juce::ADSR`, not a custom ramp.
 
 ```cpp
-SampleData applyStartAndAttack(const SampleData& source, double startMs, double attackMs);
+class SampleEdit {
+public:
+    static juce::ADSR::Parameters getAdsrParameters(float attackSeconds, float releaseSeconds);
+    double detectStartMs(const std::map<int, SampleData>& samples) const;
+    static int msToSamples(double ms, double sampleRate);
+    SampleData render(const SampleData& source) const;
+
+    void setStartMs(double ms);
+    void setAttackMs(double ms);
+    double getStartMs() const;
+    double getAttackMs() const;
+};
 ```
 
-One shared gain function so preview and export match:
+`getAdsrParameters` sets decay to 0 and sustain to 1. `render` trims to the start sample, then `setSampleRate`, `setParameters` with release 0, `noteOn`, and `applyEnvelopeToBuffer`.
 
-```cpp
-// posFromStart is 0 at the first exported/played sample.
-inline float attackGain(int posFromStart, int attackSamples)
-{
-    if (attackSamples <= 0 || posFromStart >= attackSamples)
-        return 1.0f;
-    return (float) (posFromStart + 1) / (float) attackSamples;
-}
-```
+`MainComponent` owns one `SampleEdit`. Sliders write it with the setters. Detection uses the attack currently stored on it. Called from the sampling-complete path, after `capturedSamples` is filled and before preview is enabled.
+
+`render` does not modify the source buffer.
 
 ### Preview
 
-`SamplePlaybackBuffer::startPlayback` takes a start sample index and an attack length in samples. `readPosition` begins at the start index. Each output sample is multiplied by `attackGain` until the ramp ends, then by the existing release fade.
+`SamplePlaybackBuffer` stores the sample counts and exposes `setStartSample` / `getStartSample` and `setAttackSamples` / `getAttackSamples`. `startPlayback` does not take them. It configures a `juce::ADSR` from those values and calls `noteOn`. `stopPlayback` calls `noteOff`. `readBlock` multiplies by `getNextSample`.
 
-`SamplePreviewManager` holds `std::atomic<int>` start and attack counts, in the recorded sample rate. `MainComponent` writes them when a slider moves or when the device sample rate is known. `noteOn` copies them into the voice. Do not allocate a processed buffer per note-on.
+`SamplePreviewManager` does not store start or attack. On note-on it converts `getStartMs` and `getAttackMs` with `msToSamples`, calls the two setters on the voice, then `startPlayback`. Do not allocate a processed buffer per note-on.
 
-This plan does not redo plan 001's thread model. It only requires that these two new parameters are safe to read on the audio thread.
+This plan does not redo plan 001's thread model. Do not change ADSR parameters during a note. `reset` before the next `noteOn`.
 
 ### Export call site
 
-In `MainComponent::exportSamples`, build a temporary `std::map<int, SampleData>` by running `applyStartAndAttack` on each captured note, and pass that map to `SFZExporter`, `SF2Exporter`, and `DecentSamplerExporter`. Those classes stay unaware of the sliders.
+In `MainComponent::exportSamples`, build a temporary `std::map<int, SampleData>` by running `SampleEdit::render` on each captured note, and pass that map to `SFZExporter`, `SF2Exporter`, and `DecentSamplerExporter`. Those classes stay unaware of the sliders.
 
 ### State to keep on the UI side
 
-- `detectedStartMs` — result of the last detection. 0 if there are no samples.
-- `startMs` — slider value, initialized from `detectedStartMs`.
-- `attackMs` — slider value, default 5.
+- `SampleEdit` — start and attack in milliseconds, read and written with getters and setters.
+- `detectedStartMs` — result of the last detection, for the Auto button and the "(auto N ms)" label. 0 if there are no samples.
 
 No new fields on `SampleData`. No change to note naming, pack naming, or the recording path.
 
@@ -140,22 +133,23 @@ No new fields on `SampleData`. No change to note naming, pack naming, or the rec
 ### Sound
 - [ ] Preview of a key starts at the slider position, not at the beginning of the raw take.
 - [ ] With Attack at 5 ms there is no click at the start. With Attack at 0, the file and the preview start immediately (a click is acceptable).
+- [ ] Releasing a key fades out over about 50 ms.
 - [ ] Moving a slider during a held note does not glitch that note; the next press uses the new value.
-- [ ] Exported SFZ, SF2, and Decent Sampler start at the same point and with the same attack as preview.
+- [ ] Exported SFZ, SF2, and Decent Sampler start at the same point and with the same attack as preview. The exported file has no release fade.
 - [ ] Export does not change what a later preview plays if the sliders are untouched (raw buffer still has the leading silence; playback offset still skips it).
 - [ ] Stereo WAVs stay stereo. SF2 remains mono from channel 0, as today.
 
 ### Edges
 - [ ] Start at 0 and Attack at 0 reproduces today's export.
 - [ ] Start near the end of the buffer does not read past the buffer and does not crash.
-- [ ] Attack longer than the remaining audio ramps across what is left and does not exceed 1.
+- [ ] Attack longer than the remaining audio does not exceed 1 and does not read past the buffer.
 
 ---
 
 ## Constraints and out of scope
 
 - No per-note start or attack.
-- No end trim, tail fade, or release envelope. A click at the end of a file is a separate plan.
+- No user-facing decay, sustain, or release slider. Decay is 0 and sustain is 1. Preview release stays 50 ms. Export release is 0. A click at the end of a file is a separate plan.
 - No user-facing threshold control. -40 dB and 1 ms hold are fixed.
 - No persistence of the sliders across launches.
 - No resampling. Times convert at the recorded sample rate, same rule as preview today.
@@ -163,11 +157,14 @@ No new fields on `SampleData`. No change to note naming, pack naming, or the rec
 
 ## Implementation phases
 
-1. Detection helper and the three pieces of state, set when sampling completes.
-2. Preview start offset and attack ramp.
+1. `SampleEdit`: detection and the export copy, set when sampling completes.
+2. Preview: setters on `SamplePlaybackBuffer`, `juce::ADSR` applied from `SampleEdit` at note-on.
 3. Start slider, Attack slider, Auto button.
 4. Export copy wired into the existing three exporters.
 
 ## Deviations
 
-(fill in after implementation)
+- `SampleEdit` is a class, not free functions. Review asked for that.
+- Start and attack sample counts live on `SamplePlaybackBuffer` (`setStartSample` / `getStartSample`, `setAttackSamples` / `getAttackSamples`). They are not arguments of `startPlayback`, and `SamplePreviewManager` does not store them.
+- Accessors are getters and setters. No coined names. They only read or write the stored value, and they are declared last. Milliseconds become samples in `msToSamples`, not in a getter.
+- The attack is `juce::ADSR`, not a custom gain ramp. Preview note-off is that envelope's 50 ms release. Export uses release 0.

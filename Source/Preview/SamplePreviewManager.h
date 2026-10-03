@@ -6,23 +6,25 @@
 #include <map>
 #include <memory>
 
+class SampleEdit;
+
 class SamplePreviewManager
 {
 public:
     SamplePreviewManager() = default;
 
-    void setSamples(const std::map<int, SampleData>* samples);
-    void setSampleRate(double rate);
-
-    void noteOn(int midiNote);
+    void noteOn(int midiNote, const SampleEdit& edit);
     void noteOff(int midiNote);
 
     void processBlock(float* const* outputChannelData, int numOutputChannels, int numSamples);
 
+    void setSamples(const std::map<int, SampleData>* samples);
+    void setSampleRate(double rate);
     bool hasSamples() const;
 
 private:
     void evictOldestVoice();
+    void startVoice(SamplePlaybackBuffer& voice, const SampleData& data, const SampleEdit& edit);
 
     const std::map<int, SampleData>* samplesPtr = nullptr;
     std::map<int, std::unique_ptr<SamplePlaybackBuffer>> activeVoices;

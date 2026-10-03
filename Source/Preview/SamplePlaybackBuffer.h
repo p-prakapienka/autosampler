@@ -1,6 +1,7 @@
 #pragma once
 
 #include <juce_audio_basics/juce_audio_basics.h>
+#include "../Sampling/SampleEdit.h"
 #include <atomic>
 
 class SamplePlaybackBuffer
@@ -11,21 +12,29 @@ public:
     void startPlayback(const juce::AudioBuffer<float>& source, double sourceSampleRate)
     {
         sourceBuffer = &source;
-        readPosition = 0;
-        fadingOut = false;
-        fadeGain = 1.0f;
-        fadeOutSamples = static_cast<int>(sourceSampleRate * 0.05); // 50ms
+        const int numSamples = source.getNumSamples();
+        if (numSamples <= 0 || sourceSampleRate <= 0.0) {
+            playing.store(false);
+            return;
+        }
+
+        readPosition = juce::jlimit(0, numSamples - 1, getStartSample());
+
+        const float attackSeconds = (float) getAttackSamples() / (float) sourceSampleRate;
+        envelope.reset();
+        envelope.setSampleRate(sourceSampleRate);
+        envelope.setParameters(SampleEdit::getAdsrParameters(attackSeconds, releaseSeconds));
+        envelope.noteOn();
+
         playing.store(true);
     }
 
     void stopPlayback()
     {
         if (playing.load()) {
-            fadingOut = true;
+            envelope.noteOff();
         }
     }
-
-    bool isPlaying() const { return playing.load(); }
 
     void readBlock(float* const* outputChannelData, int numOutputChannels, int numSamples)
     {
@@ -33,32 +42,22 @@ public:
             return;
         }
 
-        int sourceChannels = sourceBuffer->getNumChannels();
-        int sourceSamples = sourceBuffer->getNumSamples();
+        const int sourceChannels = sourceBuffer->getNumChannels();
+        const int sourceSamples = sourceBuffer->getNumSamples();
+        if (sourceChannels <= 0) {
+            return;
+        }
 
         for (int i = 0; i < numSamples; i++) {
-            if (readPosition >= sourceSamples) {
+            if (readPosition >= sourceSamples || !envelope.isActive()) {
                 playing.store(false);
                 return;
             }
 
-            float gain = 1.0f;
-            if (fadingOut) {
-                gain = fadeGain;
-                if (fadeOutSamples > 0) {
-                    fadeGain -= 1.0f / static_cast<float>(fadeOutSamples);
-                } else {
-                    fadeGain = 0.0f;
-                }
-
-                if (fadeGain <= 0.0f) {
-                    playing.store(false);
-                    return;
-                }
-            }
+            const float gain = envelope.getNextSample();
 
             for (int ch = 0; ch < numOutputChannels; ch++) {
-                int srcCh = juce::jmin(ch, sourceChannels - 1);
+                const int srcCh = juce::jmin(ch, sourceChannels - 1);
                 outputChannelData[ch][i] += sourceBuffer->getSample(srcCh, readPosition) * gain;
             }
 
@@ -66,13 +65,22 @@ public:
         }
     }
 
+    void setStartSample(int newStartSample) { startSample = newStartSample; }
+    int getStartSample() const { return startSample; }
+    void setAttackSamples(int newAttackSamples) { attackSamples = newAttackSamples; }
+    int getAttackSamples() const { return attackSamples; }
+    bool isPlaying() const { return playing.load(); }
+
 private:
+    static constexpr float releaseSeconds = 0.05f;
+
     const juce::AudioBuffer<float>* sourceBuffer = nullptr;
+    juce::ADSR envelope;
+    int startSample = 0;
+    int attackSamples = 0;
     int readPosition = 0;
+
     std::atomic<bool> playing { false };
-    bool fadingOut = false;
-    float fadeGain = 1.0f;
-    int fadeOutSamples = 2205; // default 50ms at 44.1kHz
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SamplePlaybackBuffer)
 };

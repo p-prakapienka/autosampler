@@ -12,12 +12,11 @@ public:
     juce::StringArray getAvailableDevices() const;
     bool openDevice(const juce::String& deviceIdentifier);
     void closeDevice();
-    bool isDeviceOpen() const { return midiOutput != nullptr; }
-
     void sendNoteOn(int channel, int noteNumber, int velocity);
     void sendNoteOff(int channel, int noteNumber);
     void sendAllNotesOff(int channel);
 
+    bool isDeviceOpen() const { return midiOutput != nullptr; }
     juce::String getCurrentDeviceName() const { return currentDeviceName; }
 
 private:
