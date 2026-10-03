@@ -13,24 +13,26 @@ void SamplePreviewManager::setSampleRate(double rate)
 
 void SamplePreviewManager::noteOn(int midiNote)
 {
-    if (samplesPtr == nullptr)
+    if (samplesPtr == nullptr) {
         return;
+    }
 
     auto it = samplesPtr->find(midiNote);
-    if (it == samplesPtr->end())
+    if (it == samplesPtr->end()) {
         return;
+    }
 
     // If already playing this note, restart it
     auto voiceIt = activeVoices.find(midiNote);
-    if (voiceIt != activeVoices.end())
-    {
+    if (voiceIt != activeVoices.end()) {
         voiceIt->second->startPlayback(it->second.audioBuffer, it->second.sampleRate);
         return;
     }
 
     // Evict oldest voice if at max
-    if (static_cast<int>(activeVoices.size()) >= maxVoices)
+    if (static_cast<int>(activeVoices.size()) >= maxVoices) {
         evictOldestVoice();
+    }
 
     auto voice = std::make_unique<SamplePlaybackBuffer>();
     voice->startPlayback(it->second.audioBuffer, it->second.sampleRate);
@@ -40,21 +42,22 @@ void SamplePreviewManager::noteOn(int midiNote)
 void SamplePreviewManager::noteOff(int midiNote)
 {
     auto it = activeVoices.find(midiNote);
-    if (it != activeVoices.end())
+    if (it != activeVoices.end()) {
         it->second->stopPlayback();
+    }
 }
 
 void SamplePreviewManager::processBlock(float* const* outputChannelData, int numOutputChannels, int numSamples)
 {
     // Process all active voices, remove finished ones
-    for (auto it = activeVoices.begin(); it != activeVoices.end();)
-    {
+    for (auto it = activeVoices.begin(); it != activeVoices.end();) {
         it->second->readBlock(outputChannelData, numOutputChannels, numSamples);
 
-        if (!it->second->isPlaying())
+        if (!it->second->isPlaying()) {
             it = activeVoices.erase(it);
-        else
+        } else {
             ++it;
+        }
     }
 }
 
@@ -65,8 +68,9 @@ bool SamplePreviewManager::hasSamples() const
 
 void SamplePreviewManager::evictOldestVoice()
 {
-    if (activeVoices.empty())
+    if (activeVoices.empty()) {
         return;
+    }
 
     // Remove the first voice (lowest note number as a simple heuristic)
     activeVoices.erase(activeVoices.begin());

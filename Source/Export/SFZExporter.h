@@ -12,21 +12,23 @@ public:
                               const juce::String& packName,
                               const juce::File& outputDirectory)
     {
-        if (samples.empty())
+        if (samples.empty()) {
             return false;
+        }
 
         // Create output directory if needed
-        if (!outputDirectory.exists())
+        if (!outputDirectory.exists()) {
             outputDirectory.createDirectory();
+        }
 
         // Write WAV files
-        for (auto& [midiNote, data] : samples)
-        {
+        for (auto& [midiNote, data] : samples) {
             auto wavFilename = WavWriter::getWavFilename(packName, midiNote);
             auto wavFile = outputDirectory.getChildFile(wavFilename);
 
-            if (!WavWriter::writeWavFile(wavFile, data))
+            if (!WavWriter::writeWavFile(wavFile, data)) {
                 return false;
+            }
         }
 
         // Generate and write SFZ file
@@ -46,8 +48,7 @@ private:
         content += "hivel=127\n\n";
 
         auto it = samples.begin();
-        while (it != samples.end())
-        {
+        while (it != samples.end()) {
             int midiNote = it->first;
             auto wavFilename = WavWriter::getWavFilename(packName, midiNote);
 
@@ -55,23 +56,17 @@ private:
             int lokey = midiNote;
             int hikey = midiNote;
 
-            if (it != samples.begin())
-            {
+            if (it != samples.begin()) {
                 auto prev = std::prev(it);
                 lokey = prev->first + (midiNote - prev->first) / 2 + 1;
-            }
-            else
-            {
+            } else {
                 lokey = midiNote;
             }
 
             auto next = std::next(it);
-            if (next != samples.end())
-            {
+            if (next != samples.end()) {
                 hikey = midiNote + (next->first - midiNote) / 2;
-            }
-            else
-            {
+            } else {
                 hikey = midiNote;
             }
 

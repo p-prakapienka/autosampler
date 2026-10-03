@@ -30,25 +30,28 @@ public:
                               const juce::String& packName,
                               const juce::File& outputDirectory)
     {
-        if (samples.empty())
+        if (samples.empty()) {
             return false;
+        }
 
-        if (!outputDirectory.exists())
+        if (!outputDirectory.exists()) {
             outputDirectory.createDirectory();
+        }
 
         // Create a Samples subdirectory for WAV files
         auto samplesDir = outputDirectory.getChildFile("Samples");
-        if (!samplesDir.exists())
+        if (!samplesDir.exists()) {
             samplesDir.createDirectory();
+        }
 
         // Write WAV files
-        for (auto& [midiNote, data] : samples)
-        {
+        for (auto& [midiNote, data] : samples) {
             auto wavFilename = WavWriter::getWavFilename(packName, midiNote);
             auto wavFile = samplesDir.getChildFile(wavFilename);
 
-            if (!WavWriter::writeWavFile(wavFile, data))
+            if (!WavWriter::writeWavFile(wavFile, data)) {
                 return false;
+            }
         }
 
         // Build XML
@@ -65,8 +68,9 @@ private:
     {
         // Collect notes into a vector for lokey/hikey calculation
         std::vector<int> midiNotes;
-        for (auto& [note, data] : samples)
+        for (auto& [note, data] : samples) {
             midiNotes.push_back(note);
+        }
 
         int numSamples = (int) midiNotes.size();
 
@@ -100,21 +104,22 @@ private:
         group->setAttribute("ampVelTrack", 1.0);
         group->setAttribute("name", packName);
 
-        for (int i = 0; i < numSamples; ++i)
-        {
+        for (int i = 0; i < numSamples; ++i) {
             int midiNote = midiNotes[(size_t) i];
 
             // Calculate key range
             int lokey, hikey;
-            if (i == 0)
+            if (i == 0) {
                 lokey = midiNote;
-            else
+            } else {
                 lokey = midiNotes[(size_t) i - 1] + (midiNote - midiNotes[(size_t) i - 1]) / 2 + 1;
+            }
 
-            if (i == numSamples - 1)
+            if (i == numSamples - 1) {
                 hikey = midiNote;
-            else
+            } else {
                 hikey = midiNote + (midiNotes[(size_t) i + 1] - midiNote) / 2;
+            }
 
             auto wavFilename = WavWriter::getWavFilename(packName, midiNote);
 

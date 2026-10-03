@@ -13,8 +13,9 @@ SamplerEngine::~SamplerEngine()
 void SamplerEngine::startSampling(int start, int end, double duration,
                                    int channel, int vel)
 {
-    if (sampling)
+    if (sampling) {
         stopSampling();
+    }
 
     startNote = start;
     endNote = end;
@@ -32,22 +33,25 @@ void SamplerEngine::startSampling(int start, int end, double duration,
 
 void SamplerEngine::stopSampling()
 {
-    if (!sampling)
+    if (!sampling) {
         return;
+    }
 
     stopTimer();
     recordingManager.stopRecording();
     midiOutputManager.sendAllNotesOff(midiChannel);
     sampling = false;
 
-    if (statusCallback)
+    if (statusCallback) {
         statusCallback("Stopped", currentNote, getTotalNotes());
+    }
 }
 
 void SamplerEngine::timerCallback()
 {
-    if (!sampling)
+    if (!sampling) {
         return;
+    }
 
     switch (currentPhase)
     {
@@ -62,8 +66,7 @@ void SamplerEngine::timerCallback()
             recordingElapsed = 0.0;
             currentPhase = NotePhase::Recording;
 
-            if (statusCallback)
-            {
+            if (statusCallback) {
                 auto noteName = getMidiNoteDisplayName(currentNote);
                 auto status = "Recording " + noteName + " (" +
                               juce::String(currentNote) + ")";
@@ -75,8 +78,7 @@ void SamplerEngine::timerCallback()
         case NotePhase::Recording:
         {
             recordingElapsed += timerIntervalMs / 1000.0;
-            if (recordingElapsed >= noteDuration)
-            {
+            if (recordingElapsed >= noteDuration) {
                 currentPhase = NotePhase::SendingNoteOff;
             }
             break;
@@ -111,13 +113,10 @@ void SamplerEngine::storeCurrentSample()
 
 void SamplerEngine::advanceToNextNote()
 {
-    if (currentNote < endNote)
-    {
+    if (currentNote < endNote) {
         currentNote++;
         currentPhase = NotePhase::SendingNoteOn;
-    }
-    else
-    {
+    } else {
         finishSampling();
     }
 }
@@ -127,10 +126,12 @@ void SamplerEngine::finishSampling()
     stopTimer();
     sampling = false;
 
-    if (statusCallback)
+    if (statusCallback) {
         statusCallback("Complete! " + juce::String(collectedSamples.size()) +
                        " samples recorded.", endNote - startNote + 1, getTotalNotes());
+    }
 
-    if (completionCallback)
+    if (completionCallback) {
         completionCallback(collectedSamples);
+    }
 }

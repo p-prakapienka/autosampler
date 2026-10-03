@@ -5,8 +5,7 @@ MainComponent::MainComponent()
 {
     // Audio device setup
     auto result = audioDeviceManager.initialiseWithDefaultDevices(2, 2);
-    if (result.isNotEmpty())
-    {
+    if (result.isNotEmpty()) {
         DBG("Audio device init error: " + result);
     }
     audioDeviceManager.addAudioCallback(this);
@@ -64,8 +63,9 @@ MainComponent::MainComponent()
     // MIDI Channel
     midiChannelLabel.setText("MIDI Channel:", juce::dontSendNotification);
     addAndMakeVisible(midiChannelLabel);
-    for (int i = 1; i <= 16; ++i)
+    for (int i = 1; i <= 16; ++i) {
         midiChannelCombo.addItem("Ch " + juce::String(i), i);
+    }
     midiChannelCombo.setSelectedId(1);
     addAndMakeVisible(midiChannelCombo);
 
@@ -271,9 +271,11 @@ void MainComponent::audioDeviceIOCallbackWithContext(
     recordingManager.recordBlock(inputChannelData, numInputChannels, numSamples);
 
     // Clear output first
-    for (int ch = 0; ch < numOutputChannels; ++ch)
-        if (outputChannelData[ch] != nullptr)
+    for (int ch = 0; ch < numOutputChannels; ++ch) {
+        if (outputChannelData[ch] != nullptr) {
             juce::FloatVectorOperations::clear(outputChannelData[ch], numSamples);
+        }
+    }
 
     // Mix preview playback into output
     previewManager.processBlock(outputChannelData, numOutputChannels, numSamples);
@@ -281,8 +283,7 @@ void MainComponent::audioDeviceIOCallbackWithContext(
 
 void MainComponent::audioDeviceAboutToStart(juce::AudioIODevice* device)
 {
-    if (device != nullptr)
-    {
+    if (device != nullptr) {
         recordingManager.prepareToRecord(
             device->getCurrentSampleRate(),
             device->getActiveInputChannels().countNumberOfSetBits(),
@@ -300,11 +301,13 @@ void MainComponent::refreshMidiDevices()
 {
     midiOutputCombo.clear();
     auto devices = midiOutputManager.getAvailableDevices();
-    for (int i = 0; i < devices.size(); ++i)
+    for (int i = 0; i < devices.size(); ++i) {
         midiOutputCombo.addItem(devices[i], i + 1);
+    }
 
-    if (devices.size() > 0)
+    if (devices.size() > 0) {
         midiOutputCombo.setSelectedId(1);
+    }
 }
 
 void MainComponent::startSampling()
@@ -312,23 +315,20 @@ void MainComponent::startSampling()
     int startNote = (int) startNoteSlider.getValue();
     int endNote = (int) endNoteSlider.getValue();
 
-    if (startNote > endNote)
-    {
+    if (startNote > endNote) {
         juce::AlertWindow::showMessageBoxAsync(juce::MessageBoxIconType::WarningIcon,
             "Invalid Range", "Start note must be less than or equal to end note.");
         return;
     }
 
-    if (midiOutputCombo.getSelectedId() == 0)
-    {
+    if (midiOutputCombo.getSelectedId() == 0) {
         juce::AlertWindow::showMessageBoxAsync(juce::MessageBoxIconType::WarningIcon,
             "No MIDI Output", "Please select a MIDI output device.");
         return;
     }
 
     auto deviceName = midiOutputCombo.getText();
-    if (!midiOutputManager.openDevice(deviceName))
-    {
+    if (!midiOutputManager.openDevice(deviceName)) {
         juce::AlertWindow::showMessageBoxAsync(juce::MessageBoxIconType::WarningIcon,
             "MIDI Error", "Could not open MIDI device: " + deviceName);
         return;
@@ -382,16 +382,14 @@ void MainComponent::showAudioSettings()
 
 void MainComponent::exportSamples()
 {
-    if (capturedSamples.empty())
-    {
+    if (capturedSamples.empty()) {
         juce::AlertWindow::showMessageBoxAsync(juce::MessageBoxIconType::WarningIcon,
             "No Samples", "No samples have been recorded yet. Run sampling first.");
         return;
     }
 
     auto packName = samplePackNameEditor.getText().trim();
-    if (packName.isEmpty())
-    {
+    if (packName.isEmpty()) {
         juce::AlertWindow::showMessageBoxAsync(juce::MessageBoxIconType::WarningIcon,
             "No Pack Name", "Please enter a sample pack name.");
         return;
@@ -403,8 +401,9 @@ void MainComponent::exportSamples()
     chooser->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories,
         [this, chooser, packName](const juce::FileChooser& fc) {
             auto dir = fc.getResult();
-            if (dir == juce::File())
+            if (dir == juce::File()) {
                 return;
+            }
 
             auto outputDir = dir.getChildFile(packName);
 
@@ -431,14 +430,11 @@ void MainComponent::exportSamples()
                     break;
             }
 
-            if (success)
-            {
+            if (success) {
                 exportStatusLabel.setText("Exported " + juce::String(capturedSamples.size()) +
                     " samples (" + formatName + ") to: " + outputDir.getFullPathName(),
                     juce::dontSendNotification);
-            }
-            else
-            {
+            } else {
                 exportStatusLabel.setText("Export failed!", juce::dontSendNotification);
             }
             exportButton.setEnabled(true);
