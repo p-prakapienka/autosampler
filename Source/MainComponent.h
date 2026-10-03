@@ -7,7 +7,6 @@
 #include "Sampling/MidiOutputManager.h"
 #include "Sampling/RecordingManager.h"
 #include "Sampling/SamplerEngine.h"
-#include "Sampling/SampleEdit.h"
 #include "Sampling/StartDetector.h"
 #include "Export/SFZExporter.h"
 #include "Export/SF2Exporter.h"
@@ -50,7 +49,6 @@ private:
     MidiOutputManager midiOutputManager;
     RecordingManager recordingManager;
     SamplerEngine samplerEngine;
-    SampleEdit sampleEdit;
     StartDetector startDetector;
 
     // UI Controls
@@ -94,7 +92,7 @@ private:
     double progress = 0.0;
     juce::ProgressBar progressBar { progress };
 
-    // Sample start / attack. Raw buffers stay intact; SampleEdit is applied on preview and export.
+    // Slider values in milliseconds. The voice converts them to samples when it plays or renders.
     juce::Label sampleStartLabel;
     juce::Slider sampleStartSlider;
     juce::Label sampleStartAutoLabel;
@@ -102,6 +100,8 @@ private:
     juce::Label attackLabel;
     juce::Slider attackSlider;
     double detectedStartMs = 0.0;
+    double startMs = 0.0;
+    double attackMs = 5.0;
 
     // Sample preview
     juce::MidiKeyboardState keyboardState;

@@ -1,5 +1,4 @@
 #include "SamplePreviewManager.h"
-#include "../Sampling/SampleEdit.h"
 
 void SamplePreviewManager::setSamples(const std::map<int, SampleData>* samples)
 {
@@ -12,14 +11,14 @@ void SamplePreviewManager::setSampleRate(double rate)
     currentSampleRate = rate;
 }
 
-void SamplePreviewManager::startVoice(SamplePlaybackBuffer& voice, const SampleData& data, const SampleEdit& edit)
+void SamplePreviewManager::startVoice(SamplePlaybackBuffer& voice, const SampleData& data, double startMs, double attackMs)
 {
-    voice.setStartSample(SampleEdit::msToSamples(edit.getStartMs(), data.sampleRate));
-    voice.setAttackSamples(SampleEdit::msToSamples(edit.getAttackMs(), data.sampleRate));
+    voice.setStartSample(SamplePlaybackBuffer::msToSamples(startMs, data.sampleRate));
+    voice.setAttackSamples(SamplePlaybackBuffer::msToSamples(attackMs, data.sampleRate));
     voice.startPlayback(data.audioBuffer, data.sampleRate);
 }
 
-void SamplePreviewManager::noteOn(int midiNote, const SampleEdit& edit)
+void SamplePreviewManager::noteOn(int midiNote, double startMs, double attackMs)
 {
     if (samplesPtr == nullptr) {
         return;
@@ -32,7 +31,7 @@ void SamplePreviewManager::noteOn(int midiNote, const SampleEdit& edit)
 
     auto voiceIt = activeVoices.find(midiNote);
     if (voiceIt != activeVoices.end()) {
-        startVoice(*voiceIt->second, it->second, edit);
+        startVoice(*voiceIt->second, it->second, startMs, attackMs);
         return;
     }
 
@@ -41,7 +40,7 @@ void SamplePreviewManager::noteOn(int midiNote, const SampleEdit& edit)
     }
 
     auto voice = std::make_unique<SamplePlaybackBuffer>();
-    startVoice(*voice, it->second, edit);
+    startVoice(*voice, it->second, startMs, attackMs);
     activeVoices[midiNote] = std::move(voice);
 }
 

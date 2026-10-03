@@ -1,5 +1,32 @@
 #include "MainComponent.h"
 
+namespace
+{
+constexpr double defaultAttackMs = 5.0;
+
+double shortestSampleMs(const std::map<int, SampleData>& samples)
+{
+    bool any = false;
+    double shortest = 0.0;
+
+    for (const auto& entry : samples) {
+        const SampleData& data = entry.second;
+        const int numSamples = data.audioBuffer.getNumSamples();
+        if (data.sampleRate <= 0.0 || numSamples <= 0) {
+            return 0.0;
+        }
+
+        const double ms = numSamples * 1000.0 / data.sampleRate;
+        if (!any || ms < shortest) {
+            shortest = ms;
+        }
+        any = true;
+    }
+
+    return any ? shortest : 0.0;
+}
+}
+
 MainComponent::MainComponent()
     : samplerEngine(midiOutputManager, recordingManager)
 {
@@ -131,7 +158,7 @@ MainComponent::MainComponent()
     sampleStartSlider.setTextValueSuffix(" ms");
     sampleStartSlider.setTextBoxStyle(juce::Slider::TextBoxLeft, false, 72, 20);
     sampleStartSlider.onValueChange = [this] {
-        sampleEdit.setStartMs(sampleStartSlider.getValue());
+        startMs = sampleStartSlider.getValue();
         refreshStartAutoLabel();
     };
     sampleStartSlider.setEnabled(false);
@@ -147,11 +174,11 @@ MainComponent::MainComponent()
     attackLabel.setText("Attack:", juce::dontSendNotification);
     addAndMakeVisible(attackLabel);
     attackSlider.setRange(0.0, 50.0, 1.0);
-    attackSlider.setValue(SampleEdit::defaultAttackMs, juce::dontSendNotification);
+    attackSlider.setValue(defaultAttackMs, juce::dontSendNotification);
     attackSlider.setTextValueSuffix(" ms");
     attackSlider.setTextBoxStyle(juce::Slider::TextBoxLeft, false, 72, 20);
     attackSlider.onValueChange = [this] {
-        sampleEdit.setAttackMs(attackSlider.getValue());
+        attackMs = attackSlider.getValue();
     };
     attackSlider.setEnabled(false);
     addAndMakeVisible(attackSlider);
@@ -176,13 +203,13 @@ MainComponent::MainComponent()
             capturedSamples = samples;
 
             // New takes get a fresh detection. Previous slider values are not reused.
-            sampleEdit.setAttackMs(SampleEdit::defaultAttackMs);
-            attackSlider.setValue(SampleEdit::defaultAttackMs, juce::dontSendNotification);
-            const double maxStartMs = std::max(0.0, SampleEdit::getShortestSampleMs(capturedSamples));
+            attackMs = defaultAttackMs;
+            attackSlider.setValue(defaultAttackMs, juce::dontSendNotification);
+            const double maxStartMs = std::max(0.0, shortestSampleMs(capturedSamples));
             const double interval = maxStartMs >= 1.0 ? 1.0 : 0.0;
             sampleStartSlider.setRange(0.0, maxStartMs, interval);
-            detectedStartMs = std::min(startDetector.detectStartMs(capturedSamples, sampleEdit.getAttackMs()), maxStartMs);
-            sampleEdit.setStartMs(detectedStartMs);
+            detectedStartMs = std::min(startDetector.detectStartMs(capturedSamples, attackMs), maxStartMs);
+            startMs = detectedStartMs;
             sampleStartSlider.setValue(detectedStartMs, juce::dontSendNotification);
             refreshStartAutoLabel();
 
@@ -470,7 +497,10 @@ void MainComponent::exportSamples()
 
             std::map<int, SampleData> processed;
             for (const auto& entry : capturedSamples) {
-                processed.emplace(entry.first, sampleEdit.render(entry.second));
+                SamplePlaybackBuffer voice;
+                voice.setStartSample(SamplePlaybackBuffer::msToSamples(startMs, entry.second.sampleRate));
+                voice.setAttackSamples(SamplePlaybackBuffer::msToSamples(attackMs, entry.second.sampleRate));
+                processed.emplace(entry.first, voice.render(entry.second));
             }
 
             auto format = static_cast<ExportFormat>(exportFormatCombo.getSelectedId() - 1);
@@ -532,7 +562,7 @@ void MainComponent::refreshStartAutoLabel()
 
 void MainComponent::handleNoteOn(juce::MidiKeyboardState*, int /*midiChannel*/, int midiNoteNumber, float /*velocity*/)
 {
-    previewManager.noteOn(midiNoteNumber, sampleEdit);
+    previewManager.noteOn(midiNoteNumber, startMs, attackMs);
 }
 
 void MainComponent::handleNoteOff(juce::MidiKeyboardState*, int /*midiChannel*/, int midiNoteNumber, float /*velocity*/)

@@ -74,50 +74,40 @@ Attack  [==●----------]   5 ms
 
 Map names onto the current desktop app (`SamplerEngine`, `SampleData`, `SamplePlaybackBuffer`, `MainComponent`). This is not a plugin.
 
-### `SampleEdit`
+### `SamplePlaybackBuffer`
 
-One class owns the edit for the current run: start and attack in milliseconds, and the export copy. The envelope is `juce::ADSR`, not a custom ramp. Onset detection is `StartDetector`, not part of the edit.
+The voice plays one recorded note. It stores a start sample and an attack length, and applies `juce::ADSR` (decay 0, sustain 1). There is no separate edit object.
+
+`startPlayback` reads those values, calls `noteOn` on the envelope, and `readBlock` multiplies by `getNextSample`. `stopPlayback` calls `noteOff`. Preview release is 50 ms.
+
+`render` is the same voice used offline for export: trim to the start sample, then `setParameters` with release 0, `noteOn`, and `applyEnvelopeToBuffer`. It does not modify the source buffer.
+
+`msToSamples` converts the slider times. The setters store sample counts only.
+
+### `StartDetector`
 
 ```cpp
 class StartDetector {
 public:
     double detectStartMs(const std::map<int, SampleData>& samples, double attackMs) const;
 };
-
-class SampleEdit {
-public:
-    static juce::ADSR::Parameters getAdsrParameters(float attackSeconds, float releaseSeconds);
-    static int msToSamples(double ms, double sampleRate);
-    SampleData render(const SampleData& source) const;
-
-    void setStartMs(double ms);
-    void setAttackMs(double ms);
-    double getStartMs() const;
-    double getAttackMs() const;
-};
 ```
 
-`getAdsrParameters` sets decay to 0 and sustain to 1. `render` trims to the start sample, then `setSampleRate`, `setParameters` with release 0, `noteOn`, and `applyEnvelopeToBuffer`.
-
-`MainComponent` owns one `SampleEdit` and one `StartDetector`. Sliders write the edit with the setters. Detection is called with the attack currently stored on the edit. Called from the sampling-complete path, after `capturedSamples` is filled and before preview is enabled.
-
-`render` does not modify the source buffer.
+`MainComponent` owns the two slider values in milliseconds and one `StartDetector`. Detection runs with the current attack. Called from the sampling-complete path, after `capturedSamples` is filled and before preview is enabled.
 
 ### Preview
 
-`SamplePlaybackBuffer` stores the sample counts and exposes `setStartSample` / `getStartSample` and `setAttackSamples` / `getAttackSamples`. `startPlayback` does not take them. It configures a `juce::ADSR` from those values and calls `noteOn`. `stopPlayback` calls `noteOff`. `readBlock` multiplies by `getNextSample`.
-
-`SamplePreviewManager` does not store start or attack. On note-on it converts `getStartMs` and `getAttackMs` with `msToSamples`, calls the two setters on the voice, then `startPlayback`. Do not allocate a processed buffer per note-on.
+`SamplePreviewManager` does not store start or attack. On note-on it converts the millisecond arguments with `msToSamples`, calls the two setters on the voice, then `startPlayback`. Do not allocate a processed buffer per note-on.
 
 This plan does not redo plan 001's thread model. Do not change ADSR parameters during a note. `reset` before the next `noteOn`.
 
 ### Export call site
 
-In `MainComponent::exportSamples`, build a temporary `std::map<int, SampleData>` by running `SampleEdit::render` on each captured note, and pass that map to `SFZExporter`, `SF2Exporter`, and `DecentSamplerExporter`. Those classes stay unaware of the sliders.
+In `MainComponent::exportSamples`, build a temporary `std::map<int, SampleData>` by setting start and attack on a `SamplePlaybackBuffer` and calling `render` for each captured note. Pass that map to `SFZExporter`, `SF2Exporter`, and `DecentSamplerExporter`. Those classes stay unaware of the sliders.
 
 ### State to keep on the UI side
 
-- `SampleEdit` — start and attack in milliseconds, read and written with getters and setters.
+- `startMs` and `attackMs` — the slider values.
 - `detectedStartMs` — result of the last detection, for the Auto button and the "(auto N ms)" label. 0 if there are no samples.
 
 No new fields on `SampleData`. No change to note naming, pack naming, or the recording path.
@@ -161,14 +151,14 @@ No new fields on `SampleData`. No change to note naming, pack naming, or the rec
 
 ## Implementation phases
 
-1. `StartDetector` and `SampleEdit`: detection and the export copy, set when sampling completes.
-2. Preview: setters on `SamplePlaybackBuffer`, `juce::ADSR` applied from `SampleEdit` at note-on.
+1. `StartDetector` and `SamplePlaybackBuffer`: detection, playback, and the export copy.
+2. Preview: the voice starts at `startSample` with `juce::ADSR`.
 3. Start slider, Attack slider, Auto button.
 4. Export copy wired into the existing three exporters.
 
 ## Deviations
 
-- `SampleEdit` is a class, not free functions. Review asked for that. Onset detection is `StartDetector`.
+- Onset detection is `StartDetector`. Playback and the export copy are the same voice, `SamplePlaybackBuffer`. There is no `SampleEdit`.
 - Start and attack sample counts live on `SamplePlaybackBuffer` (`setStartSample` / `getStartSample`, `setAttackSamples` / `getAttackSamples`). They are not arguments of `startPlayback`, and `SamplePreviewManager` does not store them.
 - Accessors are getters and setters. No coined names. They only read or write the stored value, and they are declared last. Milliseconds become samples in `msToSamples`, not in a getter.
 - The attack is `juce::ADSR`, not a custom gain ramp. Preview note-off is that envelope's 50 ms release. Export uses release 0.

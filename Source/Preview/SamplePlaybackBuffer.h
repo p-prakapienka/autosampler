@@ -1,13 +1,60 @@
 #pragma once
 
 #include <juce_audio_basics/juce_audio_basics.h>
-#include "../Sampling/SampleEdit.h"
+#include "../AutosamplerState.h"
 #include <atomic>
+#include <algorithm>
+#include <cmath>
 
+// Plays one sample from a start point with a juce::ADSR attack. Raw buffers are not modified.
 class SamplePlaybackBuffer
 {
 public:
     SamplePlaybackBuffer() = default;
+
+    static int msToSamples(double ms, double sampleRate)
+    {
+        if (ms <= 0.0 || sampleRate <= 0.0) {
+            return 0;
+        }
+        return (int) std::llround(ms * sampleRate / 1000.0);
+    }
+
+    // Message thread only. Copy that starts at the voice start, with the attack applied and no release.
+    SampleData render(const SampleData& source) const
+    {
+        SampleData out;
+        out.midiNote = source.midiNote;
+        out.sampleRate = source.sampleRate;
+
+        const int numSamples = source.audioBuffer.getNumSamples();
+        const int numChannels = source.audioBuffer.getNumChannels();
+
+        if (numSamples <= 0 || numChannels <= 0) {
+            out.numChannels = std::max(1, numChannels);
+            out.audioBuffer.setSize(out.numChannels, 0);
+            return out;
+        }
+
+        const int start = juce::jlimit(0, numSamples - 1, getStartSample());
+        const int outSamples = numSamples - start;
+        out.numChannels = numChannels;
+        out.audioBuffer.setSize(numChannels, outSamples);
+        for (int ch = 0; ch < numChannels; ch++) {
+            out.audioBuffer.copyFrom(ch, 0, source.audioBuffer, ch, start, outSamples);
+        }
+
+        if (source.sampleRate > 0.0) {
+            juce::ADSR envelope;
+            envelope.setSampleRate(source.sampleRate);
+            const float attackSeconds = (float) getAttackSamples() / (float) source.sampleRate;
+            envelope.setParameters(getAdsrParameters(attackSeconds, 0.0f));
+            envelope.noteOn();
+            envelope.applyEnvelopeToBuffer(out.audioBuffer, 0, outSamples);
+        }
+
+        return out;
+    }
 
     void startPlayback(const juce::AudioBuffer<float>& source, double sourceSampleRate)
     {
@@ -23,7 +70,7 @@ public:
         const float attackSeconds = (float) getAttackSamples() / (float) sourceSampleRate;
         envelope.reset();
         envelope.setSampleRate(sourceSampleRate);
-        envelope.setParameters(SampleEdit::getAdsrParameters(attackSeconds, releaseSeconds));
+        envelope.setParameters(getAdsrParameters(attackSeconds, releaseSeconds));
         envelope.noteOn();
 
         playing.store(true);
@@ -73,6 +120,12 @@ public:
 
 private:
     static constexpr float releaseSeconds = 0.05f;
+
+    // Decay is 0 and sustain is 1. Release is the preview fade, or 0 when baking a file.
+    static juce::ADSR::Parameters getAdsrParameters(float attackSeconds, float releaseSeconds)
+    {
+        return { attackSeconds, 0.0f, 1.0f, releaseSeconds };
+    }
 
     const juce::AudioBuffer<float>* sourceBuffer = nullptr;
     juce::ADSR envelope;
