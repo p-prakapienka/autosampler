@@ -16,17 +16,14 @@ public:
     using StatusCallback = std::function<void(const juce::String& status, int currentNote, int totalNotes)>;
     using CompletionCallback = std::function<void(const std::map<int, SampleData>& samples)>;
 
-    void setStatusCallback(StatusCallback callback) { statusCallback = std::move(callback); }
-    void setCompletionCallback(CompletionCallback callback) { completionCallback = std::move(callback); }
-
     void startSampling(int startNote, int endNote, double noteDuration,
                        int midiChannel, int velocity);
     void stopSampling();
-    bool isSampling() const { return sampling; }
 
+    void setStatusCallback(StatusCallback callback) { statusCallback = std::move(callback); }
+    void setCompletionCallback(CompletionCallback callback) { completionCallback = std::move(callback); }
+    bool isSampling() const { return sampling; }
     int getCurrentNote() const { return currentNote; }
-    int getTotalNotes() const { return endNote - startNote + 1; }
-    int getCompletedNotes() const { return currentNote - startNote; }
 
 private:
     void timerCallback() override;

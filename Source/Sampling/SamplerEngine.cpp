@@ -43,7 +43,7 @@ void SamplerEngine::stopSampling()
     sampling = false;
 
     if (statusCallback) {
-        statusCallback("Stopped", currentNote, getTotalNotes());
+        statusCallback("Stopped", currentNote, endNote - startNote + 1);
     }
 }
 
@@ -70,7 +70,7 @@ void SamplerEngine::timerCallback()
                 auto noteName = getMidiNoteDisplayName(currentNote);
                 auto status = "Recording " + noteName + " (" +
                               juce::String(currentNote) + ")";
-                statusCallback(status, getCompletedNotes(), getTotalNotes());
+                statusCallback(status, currentNote - startNote, endNote - startNote + 1);
             }
             break;
         }
@@ -128,7 +128,7 @@ void SamplerEngine::finishSampling()
 
     if (statusCallback) {
         statusCallback("Complete! " + juce::String(collectedSamples.size()) +
-                       " samples recorded.", endNote - startNote + 1, getTotalNotes());
+                       " samples recorded.", endNote - startNote + 1, endNote - startNote + 1);
     }
 
     if (completionCallback) {

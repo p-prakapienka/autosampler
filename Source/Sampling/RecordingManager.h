@@ -12,11 +12,10 @@ public:
     void prepareToRecord(double sampleRate, int numChannels, double maxDurationSeconds);
     void startRecording();
     void stopRecording();
-    bool isCurrentlyRecording() const { return recording.load(); }
-
     void recordBlock(const float* const* inputChannelData, int numChannels, int numSamples);
-
     juce::AudioBuffer<float> getRecordedBuffer() const;
+
+    bool isCurrentlyRecording() const { return recording.load(); }
     int getRecordedSampleCount() const { return writePosition.load(); }
     double getCurrentSampleRate() const { return currentSampleRate; }
     int getCurrentNumChannels() const { return currentNumChannels; }

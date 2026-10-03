@@ -7,6 +7,7 @@
 #include "Sampling/MidiOutputManager.h"
 #include "Sampling/RecordingManager.h"
 #include "Sampling/SamplerEngine.h"
+#include "Sampling/StartDetector.h"
 #include "Export/SFZExporter.h"
 #include "Export/SF2Exporter.h"
 #include "Export/DecentSamplerExporter.h"
@@ -39,6 +40,7 @@ private:
     void showAudioSettings();
     void exportSamples();
     void updateControlsEnabled();
+    void refreshStartAutoLabel();
 
     void handleNoteOn(juce::MidiKeyboardState*, int midiChannel, int midiNoteNumber, float velocity) override;
     void handleNoteOff(juce::MidiKeyboardState*, int midiChannel, int midiNoteNumber, float velocity) override;
@@ -47,6 +49,7 @@ private:
     MidiOutputManager midiOutputManager;
     RecordingManager recordingManager;
     SamplerEngine samplerEngine;
+    StartDetector startDetector;
 
     // UI Controls
     juce::Label titleLabel;
@@ -88,6 +91,17 @@ private:
     juce::Label statusLabel;
     double progress = 0.0;
     juce::ProgressBar progressBar { progress };
+
+    // Slider values in milliseconds. The voice converts them to samples when it plays or renders.
+    juce::Label sampleStartLabel;
+    juce::Slider sampleStartSlider;
+    juce::Label sampleStartAutoLabel;
+    juce::TextButton autoStartButton { "Auto" };
+    juce::Label attackLabel;
+    juce::Slider attackSlider;
+    double detectedStartMs = 0.0;
+    double startMs = 0.0;
+    double attackMs = 5.0;
 
     // Sample preview
     juce::MidiKeyboardState keyboardState;

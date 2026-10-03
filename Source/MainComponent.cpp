@@ -1,5 +1,32 @@
 #include "MainComponent.h"
 
+namespace
+{
+constexpr double defaultAttackMs = 5.0;
+
+double shortestSampleMs(const std::map<int, SampleData>& samples)
+{
+    bool any = false;
+    double shortest = 0.0;
+
+    for (const auto& entry : samples) {
+        const SampleData& data = entry.second;
+        const int numSamples = data.audioBuffer.getNumSamples();
+        if (data.sampleRate <= 0.0 || numSamples <= 0) {
+            return 0.0;
+        }
+
+        const double ms = numSamples * 1000.0 / data.sampleRate;
+        if (!any || ms < shortest) {
+            shortest = ms;
+        }
+        any = true;
+    }
+
+    return any ? shortest : 0.0;
+}
+}
+
 MainComponent::MainComponent()
     : samplerEngine(midiOutputManager, recordingManager)
 {
@@ -123,6 +150,39 @@ MainComponent::MainComponent()
     addAndMakeVisible(progressBar);
     progress = 0.0;
 
+    // Sample start and attack
+    sampleStartLabel.setText("Start:", juce::dontSendNotification);
+    addAndMakeVisible(sampleStartLabel);
+    sampleStartSlider.setRange(0.0, 0.0, 1.0);
+    sampleStartSlider.setValue(0.0, juce::dontSendNotification);
+    sampleStartSlider.setTextValueSuffix(" ms");
+    sampleStartSlider.setTextBoxStyle(juce::Slider::TextBoxLeft, false, 72, 20);
+    sampleStartSlider.onValueChange = [this] {
+        startMs = sampleStartSlider.getValue();
+        refreshStartAutoLabel();
+    };
+    sampleStartSlider.setEnabled(false);
+    addAndMakeVisible(sampleStartSlider);
+    sampleStartAutoLabel.setJustificationType(juce::Justification::centredLeft);
+    addAndMakeVisible(sampleStartAutoLabel);
+    autoStartButton.onClick = [this] {
+        sampleStartSlider.setValue(detectedStartMs, juce::sendNotification);
+    };
+    autoStartButton.setEnabled(false);
+    addAndMakeVisible(autoStartButton);
+
+    attackLabel.setText("Attack:", juce::dontSendNotification);
+    addAndMakeVisible(attackLabel);
+    attackSlider.setRange(0.0, 50.0, 1.0);
+    attackSlider.setValue(defaultAttackMs, juce::dontSendNotification);
+    attackSlider.setTextValueSuffix(" ms");
+    attackSlider.setTextBoxStyle(juce::Slider::TextBoxLeft, false, 72, 20);
+    attackSlider.onValueChange = [this] {
+        attackMs = attackSlider.getValue();
+    };
+    attackSlider.setEnabled(false);
+    addAndMakeVisible(attackSlider);
+
     // MIDI Keyboard for sample preview
     midiKeyboard.setAvailableRange(36, 84); // C2 to C6
     midiKeyboard.setEnabled(false);
@@ -141,13 +201,25 @@ MainComponent::MainComponent()
     samplerEngine.setCompletionCallback([this](const std::map<int, SampleData>& samples) {
         juce::MessageManager::callAsync([this, samples] {
             capturedSamples = samples;
+
+            // New takes get a fresh detection. Previous slider values are not reused.
+            attackMs = defaultAttackMs;
+            attackSlider.setValue(defaultAttackMs, juce::dontSendNotification);
+            const double maxStartMs = std::max(0.0, shortestSampleMs(capturedSamples));
+            const double interval = maxStartMs >= 1.0 ? 1.0 : 0.0;
+            sampleStartSlider.setRange(0.0, maxStartMs, interval);
+            detectedStartMs = std::min(startDetector.detectStartMs(capturedSamples, attackMs), maxStartMs);
+            startMs = detectedStartMs;
+            sampleStartSlider.setValue(detectedStartMs, juce::dontSendNotification);
+            refreshStartAutoLabel();
+
             previewManager.setSamples(&capturedSamples);
             progress = 1.0;
             updateControlsEnabled();
         });
     });
 
-    setSize(500, 830);
+    setSize(500, 920);
 }
 
 MainComponent::~MainComponent()
@@ -256,6 +328,21 @@ void MainComponent::resized()
     exportStatusLabel.setBounds(area.removeFromTop(rowHeight));
     area.removeFromTop(spacing);
 
+    // Sample start
+    row = area.removeFromTop(rowHeight);
+    sampleStartLabel.setBounds(row.removeFromLeft(labelWidth));
+    autoStartButton.setBounds(row.removeFromRight(70));
+    row.removeFromRight(5);
+    sampleStartAutoLabel.setBounds(row.removeFromRight(120));
+    sampleStartSlider.setBounds(row);
+    area.removeFromTop(spacing);
+
+    // Attack
+    row = area.removeFromTop(rowHeight);
+    attackLabel.setBounds(row.removeFromLeft(labelWidth));
+    attackSlider.setBounds(row);
+    area.removeFromTop(spacing);
+
     // MIDI Keyboard at bottom
     midiKeyboard.setBounds(area.removeFromBottom(120));
 }
@@ -335,9 +422,6 @@ void MainComponent::startSampling()
     }
 
     progress = 0.0;
-    runButton.setEnabled(false);
-    stopButton.setEnabled(true);
-
     samplerEngine.startSampling(
         startNote,
         endNote,
@@ -345,6 +429,7 @@ void MainComponent::startSampling()
         midiChannelCombo.getSelectedId(),
         (int) velocitySlider.getValue()
     );
+    updateControlsEnabled();
 }
 
 void MainComponent::stopSampling()
@@ -410,6 +495,14 @@ void MainComponent::exportSamples()
             exportStatusLabel.setText("Exporting...", juce::dontSendNotification);
             exportButton.setEnabled(false);
 
+            std::map<int, SampleData> processed;
+            for (const auto& entry : capturedSamples) {
+                SamplePlaybackBuffer voice;
+                voice.setStartSample(SamplePlaybackBuffer::msToSamples(startMs, entry.second.sampleRate));
+                voice.setAttackSamples(SamplePlaybackBuffer::msToSamples(attackMs, entry.second.sampleRate));
+                processed.emplace(entry.first, voice.render(entry.second));
+            }
+
             auto format = static_cast<ExportFormat>(exportFormatCombo.getSelectedId() - 1);
             bool success = false;
             juce::String formatName;
@@ -417,21 +510,21 @@ void MainComponent::exportSamples()
             switch (format)
             {
                 case ExportFormat::SFZ:
-                    success = SFZExporter::exportSamples(capturedSamples, packName, outputDir);
+                    success = SFZExporter::exportSamples(processed, packName, outputDir);
                     formatName = "SFZ";
                     break;
                 case ExportFormat::SF2:
-                    success = SF2Exporter::exportSamples(capturedSamples, packName, outputDir);
+                    success = SF2Exporter::exportSamples(processed, packName, outputDir);
                     formatName = "SF2";
                     break;
                 case ExportFormat::DecentSampler:
-                    success = DecentSamplerExporter::exportSamples(capturedSamples, packName, outputDir);
+                    success = DecentSamplerExporter::exportSamples(processed, packName, outputDir);
                     formatName = "Decent Sampler";
                     break;
             }
 
             if (success) {
-                exportStatusLabel.setText("Exported " + juce::String(capturedSamples.size()) +
+                exportStatusLabel.setText("Exported " + juce::String(processed.size()) +
                     " samples (" + formatName + ") to: " + outputDir.getFullPathName(),
                     juce::dontSendNotification);
             } else {
@@ -443,16 +536,33 @@ void MainComponent::exportSamples()
 
 void MainComponent::updateControlsEnabled()
 {
-    bool isSampling = samplerEngine.isSampling();
+    const bool isSampling = samplerEngine.isSampling();
+    const bool hasSamples = !capturedSamples.empty();
+    const bool canEditSamples = !isSampling && hasSamples;
+
     runButton.setEnabled(!isSampling);
     stopButton.setEnabled(isSampling);
-    exportButton.setEnabled(!isSampling && !capturedSamples.empty());
-    midiKeyboard.setEnabled(!isSampling && !capturedSamples.empty());
+    exportButton.setEnabled(canEditSamples);
+    midiKeyboard.setEnabled(canEditSamples);
+    sampleStartSlider.setEnabled(canEditSamples);
+    sampleStartAutoLabel.setEnabled(canEditSamples);
+    autoStartButton.setEnabled(canEditSamples);
+    attackSlider.setEnabled(canEditSamples);
+}
+
+void MainComponent::refreshStartAutoLabel()
+{
+    if (std::abs(sampleStartSlider.getValue() - detectedStartMs) >= 0.5) {
+        sampleStartAutoLabel.setText("(auto " + juce::String(juce::roundToInt(detectedStartMs)) + " ms)",
+                                     juce::dontSendNotification);
+    } else {
+        sampleStartAutoLabel.setText({}, juce::dontSendNotification);
+    }
 }
 
 void MainComponent::handleNoteOn(juce::MidiKeyboardState*, int /*midiChannel*/, int midiNoteNumber, float /*velocity*/)
 {
-    previewManager.noteOn(midiNoteNumber);
+    previewManager.noteOn(midiNoteNumber, startMs, attackMs);
 }
 
 void MainComponent::handleNoteOff(juce::MidiKeyboardState*, int /*midiChannel*/, int midiNoteNumber, float /*velocity*/)

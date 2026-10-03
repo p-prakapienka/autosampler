@@ -11,7 +11,14 @@ void SamplePreviewManager::setSampleRate(double rate)
     currentSampleRate = rate;
 }
 
-void SamplePreviewManager::noteOn(int midiNote)
+void SamplePreviewManager::startVoice(SamplePlaybackBuffer& voice, const SampleData& data, double startMs, double attackMs)
+{
+    voice.setStartSample(SamplePlaybackBuffer::msToSamples(startMs, data.sampleRate));
+    voice.setAttackSamples(SamplePlaybackBuffer::msToSamples(attackMs, data.sampleRate));
+    voice.startPlayback(data.audioBuffer, data.sampleRate);
+}
+
+void SamplePreviewManager::noteOn(int midiNote, double startMs, double attackMs)
 {
     if (samplesPtr == nullptr) {
         return;
@@ -22,20 +29,18 @@ void SamplePreviewManager::noteOn(int midiNote)
         return;
     }
 
-    // If already playing this note, restart it
     auto voiceIt = activeVoices.find(midiNote);
     if (voiceIt != activeVoices.end()) {
-        voiceIt->second->startPlayback(it->second.audioBuffer, it->second.sampleRate);
+        startVoice(*voiceIt->second, it->second, startMs, attackMs);
         return;
     }
 
-    // Evict oldest voice if at max
     if (static_cast<int>(activeVoices.size()) >= maxVoices) {
         evictOldestVoice();
     }
 
     auto voice = std::make_unique<SamplePlaybackBuffer>();
-    voice->startPlayback(it->second.audioBuffer, it->second.sampleRate);
+    startVoice(*voice, it->second, startMs, attackMs);
     activeVoices[midiNote] = std::move(voice);
 }
 
@@ -49,7 +54,6 @@ void SamplePreviewManager::noteOff(int midiNote)
 
 void SamplePreviewManager::processBlock(float* const* outputChannelData, int numOutputChannels, int numSamples)
 {
-    // Process all active voices, remove finished ones
     for (auto it = activeVoices.begin(); it != activeVoices.end();) {
         it->second->readBlock(outputChannelData, numOutputChannels, numSamples);
 
