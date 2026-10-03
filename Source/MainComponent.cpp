@@ -79,6 +79,14 @@ MainComponent::MainComponent()
     durationSlider.setTextBoxStyle(juce::Slider::TextBoxLeft, false, 50, 20);
     addAndMakeVisible(durationSlider);
 
+    // Release
+    releaseLabel.setText("Release (s):", juce::dontSendNotification);
+    addAndMakeVisible(releaseLabel);
+    releaseSlider.setRange(0.0, 10.0, 0.1);
+    releaseSlider.setValue(1.0);
+    releaseSlider.setTextBoxStyle(juce::Slider::TextBoxLeft, false, 50, 20);
+    addAndMakeVisible(releaseSlider);
+
     // Velocity
     velocityLabel.setText("Velocity:", juce::dontSendNotification);
     addAndMakeVisible(velocityLabel);
@@ -219,7 +227,7 @@ MainComponent::MainComponent()
         });
     });
 
-    setSize(500, 920);
+    setSize(500, 958);
 }
 
 MainComponent::~MainComponent()
@@ -267,6 +275,12 @@ void MainComponent::resized()
     row = area.removeFromTop(rowHeight);
     durationLabel.setBounds(row.removeFromLeft(labelWidth));
     durationSlider.setBounds(row);
+    area.removeFromTop(spacing);
+
+    // Release row
+    row = area.removeFromTop(rowHeight);
+    releaseLabel.setBounds(row.removeFromLeft(labelWidth));
+    releaseSlider.setBounds(row);
     area.removeFromTop(spacing);
 
     // Velocity row
@@ -426,6 +440,7 @@ void MainComponent::startSampling()
         startNote,
         endNote,
         durationSlider.getValue(),
+        releaseSlider.getValue(),
         midiChannelCombo.getSelectedId(),
         (int) velocitySlider.getValue()
     );

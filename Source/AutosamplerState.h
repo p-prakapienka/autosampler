@@ -24,6 +24,7 @@ struct AutosamplerState
     int startNote = 48;      // C3
     int endNote = 72;        // C5
     double noteDuration = 3.0;
+    double releaseDuration = 1.0;
     int midiChannel = 1;
     int velocity = 100;
     juce::String samplePackName = "MySamples";

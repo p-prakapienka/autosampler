@@ -4,7 +4,7 @@ Standalone JUCE desktop app that samples a hardware or software MIDI instrument 
 
 ## What it does
 
-1. Sends MIDI Note On/Off for a range of notes (fixed length, chosen channel and velocity).
+1. Sends MIDI Note On for a range of notes, holds each note for a fixed length, sends Note Off, and keeps recording for a release time before the next note. Channel and velocity are chosen once for the run.
 2. Records audio from the input selected in the JUCE audio settings.
 3. Keeps each note's recording in memory.
 4. Exports an instrument in SFZ, SF2, or Decent Sampler.
@@ -36,7 +36,7 @@ Run `JUCE Autosampler.exe`. If Windows reports a missing DLL, install the latest
 
 v1 works. Decisions, UI, and naming conventions: [docs/reader.md](docs/reader.md).
 
-Next feature: [docs/plans/002-sample-start-and-attack.md](docs/plans/002-sample-start-and-attack.md) (adjustable sample start and attack).
+Recording release time: [docs/plans/003-recording-release.md](docs/plans/003-recording-release.md). After the note length, Note Off is sent and recording continues for the release time.
 
 ## Docs
 

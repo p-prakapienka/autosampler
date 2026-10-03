@@ -65,6 +65,9 @@ private:
     juce::Label durationLabel;
     juce::Slider durationSlider;
 
+    juce::Label releaseLabel;
+    juce::Slider releaseSlider;
+
     juce::Label velocityLabel;
     juce::Slider velocitySlider;
 
