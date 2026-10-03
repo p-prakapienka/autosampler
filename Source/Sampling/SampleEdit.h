@@ -15,8 +15,6 @@ public:
         return { attackSeconds, 0.0f, 1.0f, releaseSeconds };
     }
 
-    // Median onset, pulled forward by the current attack so the fade ends as the transient begins.
-    double detectStartMs(const std::map<int, SampleData>& samples) const;
     static double getShortestSampleMs(const std::map<int, SampleData>& samples);
     static int msToSamples(double ms, double sampleRate);
 
@@ -29,8 +27,6 @@ public:
     double getAttackMs() const { return attackMs; }
 
 private:
-    static int findOnsetSample(const SampleData& data);
-
     double startMs = 0.0;
     double attackMs = defaultAttackMs;
 };

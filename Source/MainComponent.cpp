@@ -181,7 +181,7 @@ MainComponent::MainComponent()
             const double maxStartMs = std::max(0.0, SampleEdit::getShortestSampleMs(capturedSamples));
             const double interval = maxStartMs >= 1.0 ? 1.0 : 0.0;
             sampleStartSlider.setRange(0.0, maxStartMs, interval);
-            detectedStartMs = std::min(sampleEdit.detectStartMs(capturedSamples), maxStartMs);
+            detectedStartMs = std::min(startDetector.detectStartMs(capturedSamples, sampleEdit.getAttackMs()), maxStartMs);
             sampleEdit.setStartMs(detectedStartMs);
             sampleStartSlider.setValue(detectedStartMs, juce::dontSendNotification);
             refreshStartAutoLabel();

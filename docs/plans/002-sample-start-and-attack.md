@@ -76,13 +76,17 @@ Map names onto the current desktop app (`SamplerEngine`, `SampleData`, `SamplePl
 
 ### `SampleEdit`
 
-One class owns the edit for the current run: start and attack in milliseconds, onset detection, and the export copy. The envelope is `juce::ADSR`, not a custom ramp.
+One class owns the edit for the current run: start and attack in milliseconds, and the export copy. The envelope is `juce::ADSR`, not a custom ramp. Onset detection is `StartDetector`, not part of the edit.
 
 ```cpp
+class StartDetector {
+public:
+    double detectStartMs(const std::map<int, SampleData>& samples, double attackMs) const;
+};
+
 class SampleEdit {
 public:
     static juce::ADSR::Parameters getAdsrParameters(float attackSeconds, float releaseSeconds);
-    double detectStartMs(const std::map<int, SampleData>& samples) const;
     static int msToSamples(double ms, double sampleRate);
     SampleData render(const SampleData& source) const;
 
@@ -95,7 +99,7 @@ public:
 
 `getAdsrParameters` sets decay to 0 and sustain to 1. `render` trims to the start sample, then `setSampleRate`, `setParameters` with release 0, `noteOn`, and `applyEnvelopeToBuffer`.
 
-`MainComponent` owns one `SampleEdit`. Sliders write it with the setters. Detection uses the attack currently stored on it. Called from the sampling-complete path, after `capturedSamples` is filled and before preview is enabled.
+`MainComponent` owns one `SampleEdit` and one `StartDetector`. Sliders write the edit with the setters. Detection is called with the attack currently stored on the edit. Called from the sampling-complete path, after `capturedSamples` is filled and before preview is enabled.
 
 `render` does not modify the source buffer.
 
@@ -157,14 +161,14 @@ No new fields on `SampleData`. No change to note naming, pack naming, or the rec
 
 ## Implementation phases
 
-1. `SampleEdit`: detection and the export copy, set when sampling completes.
+1. `StartDetector` and `SampleEdit`: detection and the export copy, set when sampling completes.
 2. Preview: setters on `SamplePlaybackBuffer`, `juce::ADSR` applied from `SampleEdit` at note-on.
 3. Start slider, Attack slider, Auto button.
 4. Export copy wired into the existing three exporters.
 
 ## Deviations
 
-- `SampleEdit` is a class, not free functions. Review asked for that.
+- `SampleEdit` is a class, not free functions. Review asked for that. Onset detection is `StartDetector`.
 - Start and attack sample counts live on `SamplePlaybackBuffer` (`setStartSample` / `getStartSample`, `setAttackSamples` / `getAttackSamples`). They are not arguments of `startPlayback`, and `SamplePreviewManager` does not store them.
 - Accessors are getters and setters. No coined names. They only read or write the stored value, and they are declared last. Milliseconds become samples in `msToSamples`, not in a getter.
 - The attack is `juce::ADSR`, not a custom gain ramp. Preview note-off is that envelope's 50 ms release. Export uses release 0.

@@ -8,6 +8,7 @@
 #include "Sampling/RecordingManager.h"
 #include "Sampling/SamplerEngine.h"
 #include "Sampling/SampleEdit.h"
+#include "Sampling/StartDetector.h"
 #include "Export/SFZExporter.h"
 #include "Export/SF2Exporter.h"
 #include "Export/DecentSamplerExporter.h"
@@ -50,6 +51,7 @@ private:
     RecordingManager recordingManager;
     SamplerEngine samplerEngine;
     SampleEdit sampleEdit;
+    StartDetector startDetector;
 
     // UI Controls
     juce::Label titleLabel;

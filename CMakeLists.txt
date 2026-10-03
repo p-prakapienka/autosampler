@@ -27,6 +27,7 @@ target_sources(JuceAutosampler PRIVATE
     Source/Sampling/RecordingManager.cpp
     Source/Sampling/SamplerEngine.cpp
     Source/Sampling/SampleEdit.cpp
+    Source/Sampling/StartDetector.cpp
     Source/Preview/SamplePreviewManager.cpp
 )
 
