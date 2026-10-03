@@ -80,7 +80,7 @@ The voice plays one recorded note. It stores a start sample and an attack length
 
 `startPlayback` reads those values, calls `noteOn` on the envelope, and `readBlock` multiplies by `getNextSample`. `stopPlayback` calls `noteOff`. Preview release is 50 ms.
 
-`render` is the same voice used offline for export: trim to the start sample, then `setParameters` with release 0, `noteOn`, and `applyEnvelopeToBuffer`. It does not modify the source buffer.
+`render` is export. It calls `startPlayback` and then `readBlock` for the whole note, and it does not call `stopPlayback`, so the file has the same attack and no release fade. It does not modify the source buffer.
 
 `msToSamples` converts the slider times. The setters store sample counts only.
 

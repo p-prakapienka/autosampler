@@ -20,8 +20,8 @@ public:
         return (int) std::llround(ms * sampleRate / 1000.0);
     }
 
-    // Message thread only. Copy that starts at the voice start, with the attack applied and no release.
-    SampleData render(const SampleData& source) const
+    // Message thread only. Plays this voice into a new buffer and does not release, so the file matches preview without the note-off fade.
+    SampleData render(const SampleData& source)
     {
         SampleData out;
         out.midiNote = source.midiNote;
@@ -40,17 +40,17 @@ public:
         const int outSamples = numSamples - start;
         out.numChannels = numChannels;
         out.audioBuffer.setSize(numChannels, outSamples);
-        for (int ch = 0; ch < numChannels; ch++) {
-            out.audioBuffer.copyFrom(ch, 0, source.audioBuffer, ch, start, outSamples);
-        }
 
-        if (source.sampleRate > 0.0) {
-            juce::ADSR envelope;
-            envelope.setSampleRate(source.sampleRate);
-            const float attackSeconds = (float) getAttackSamples() / (float) source.sampleRate;
-            envelope.setParameters(getAdsrParameters(attackSeconds, 0.0f));
-            envelope.noteOn();
-            envelope.applyEnvelopeToBuffer(out.audioBuffer, 0, outSamples);
+        startPlayback(source.audioBuffer, source.sampleRate);
+        if (isPlaying()) {
+            out.audioBuffer.clear();
+            readBlock(out.audioBuffer.getArrayOfWritePointers(), numChannels, outSamples);
+            sourceBuffer = nullptr;
+            playing.store(false);
+        } else {
+            for (int ch = 0; ch < numChannels; ch++) {
+                out.audioBuffer.copyFrom(ch, 0, source.audioBuffer, ch, start, outSamples);
+            }
         }
 
         return out;
@@ -121,7 +121,7 @@ public:
 private:
     static constexpr float releaseSeconds = 0.05f;
 
-    // Decay is 0 and sustain is 1. Release is the preview fade, or 0 when baking a file.
+    // Decay is 0 and sustain is 1. Release is the preview fade after note-off. Export never releases.
     static juce::ADSR::Parameters getAdsrParameters(float attackSeconds, float releaseSeconds)
     {
         return { attackSeconds, 0.0f, 1.0f, releaseSeconds };
