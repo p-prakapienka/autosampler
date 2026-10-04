@@ -1,8 +1,10 @@
 cmake_minimum_required(VERSION 3.22)
-project(JuceAutosampler VERSION 0.0.1)
+project(JuceAutosampler VERSION 0.0.3)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+set(AUTOSAMPLER_BUILD_ID "" CACHE STRING "CI build label shown in the window title. Empty for a local build.")
 
 include(FetchContent)
 
@@ -39,6 +41,7 @@ target_compile_definitions(JuceAutosampler PRIVATE
     JUCE_USE_CURL=0
     JUCE_APPLICATION_NAME_STRING="$<TARGET_PROPERTY:JuceAutosampler,JUCE_PRODUCT_NAME>"
     JUCE_APPLICATION_VERSION_STRING="$<TARGET_PROPERTY:JuceAutosampler,JUCE_VERSION>"
+    "AUTOSAMPLER_BUILD_ID=\"${AUTOSAMPLER_BUILD_ID}\""
 )
 
 target_link_libraries(JuceAutosampler PRIVATE

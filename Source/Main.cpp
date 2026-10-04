@@ -13,7 +13,12 @@ public:
 
     void initialise(const juce::String&) override
     {
-        mainWindow = std::make_unique<MainWindow>(getApplicationName());
+        auto title = getApplicationName();
+        const auto buildId = juce::String(AUTOSAMPLER_BUILD_ID);
+        if (buildId.isNotEmpty())
+            title << " " << buildId;
+
+        mainWindow = std::make_unique<MainWindow>(title);
     }
 
     void shutdown() override

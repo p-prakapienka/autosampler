@@ -22,15 +22,9 @@ The target is `JuceAutosampler` (product name "JUCE Autosampler").
 
 ## Download a build
 
-Pushes to `main` (and manual runs) build a Windows x64 app. Open the latest green run of [Build](https://github.com/p-prakapienka/autosampler/actions/workflows/build.yml) and download `autosampler-windows-x64`.
+Pushes to `main` (and manual runs) build a Windows x64 app. Open the latest green run of [Build](https://github.com/p-prakapienka/autosampler/actions/workflows/build.yml) and download the `.exe`.
 
-GitHub wraps the artifact in a zip. Unzip that, then unpack the `.tar.gz` inside:
-
-```bash
-tar -xzf autosampler-windows-x64.tar.gz
-```
-
-Run `JUCE Autosampler.exe`. If Windows reports a missing DLL, install the latest Microsoft Visual C++ Redistributable (x64).
+The file name is `JUCE Autosampler <version>.<build>.exe`, for example `JUCE Autosampler 0.0.3.46.exe`. Version comes from `CMakeLists.txt`. Build is the workflow run number. The same label is in the window title. Run that file. If Windows reports a missing DLL, install the latest Microsoft Visual C++ Redistributable (x64).
 
 ## Status
 

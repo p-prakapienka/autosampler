@@ -22,33 +22,42 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
+      - name: Build label
+        id: label
+        shell: bash
+        run: |
+          set -euo pipefail
+          version=$(awk -F'VERSION ' '/^project\(/ { split($2, a, /[^0-9.]/); print a[1]; exit }' CMakeLists.txt)
+          if [[ -z "$version" ]]; then
+            echo "Could not read VERSION from CMakeLists.txt" >&2
+            exit 1
+          fi
+          label="${version}.${{ github.run_number }}"
+          echo "label=$label" >> "$GITHUB_OUTPUT"
+          echo "Build label: $label"
+
       - name: Configure
-        run: cmake -B build -G "Visual Studio 17 2022" -A x64
+        run: cmake -B build -G "Visual Studio 17 2022" -A x64 "-DAUTOSAMPLER_BUILD_ID=${{ steps.label.outputs.label }}"
 
       - name: Build
         run: cmake --build build --config Release --parallel
 
-      - name: Package
+      - name: Name executable
         shell: bash
         run: |
           set -euo pipefail
-          src="build/JuceAutosampler_artefacts/Release"
-          if [[ ! -d "$src" ]]; then
-            echo "Expected JUCE output at $src" >&2
+          src="build/JuceAutosampler_artefacts/Release/JUCE Autosampler.exe"
+          if [[ ! -f "$src" ]]; then
+            echo "Expected executable at $src" >&2
             find build -maxdepth 5 \( -type d -o -type f \) | head -200 >&2
             exit 1
           fi
-          mkdir -p package
-          cp -a "$src"/. package/
-          find package -type f \( -name '*.pdb' -o -name '*.ilk' -o -name '*.exp' \) -delete
-          tar -czf autosampler-windows-x64.tar.gz -C package .
-          tar -tzf autosampler-windows-x64.tar.gz
+          cp "$src" "JUCE Autosampler ${{ steps.label.outputs.label }}.exe"
 
-      - name: Upload artifact
+      - name: Upload executable
         uses: actions/upload-artifact@v7
         with:
-          name: autosampler-windows-x64
-          path: autosampler-windows-x64.tar.gz
+          path: "JUCE Autosampler ${{ steps.label.outputs.label }}.exe"
           if-no-files-found: error
           retention-days: 30
-          compression-level: 0
+          archive: false
