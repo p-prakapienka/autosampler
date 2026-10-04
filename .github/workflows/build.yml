@@ -28,27 +28,21 @@ jobs:
       - name: Build
         run: cmake --build build --config Release --parallel
 
-      - name: Package
+      - name: Check executable
         shell: bash
         run: |
           set -euo pipefail
-          src="build/JuceAutosampler_artefacts/Release"
-          if [[ ! -d "$src" ]]; then
-            echo "Expected JUCE output at $src" >&2
+          exe="build/JuceAutosampler_artefacts/Release/JUCE Autosampler.exe"
+          if [[ ! -f "$exe" ]]; then
+            echo "Expected executable at $exe" >&2
             find build -maxdepth 5 \( -type d -o -type f \) | head -200 >&2
             exit 1
           fi
-          mkdir -p package
-          cp -a "$src"/. package/
-          find package -type f \( -name '*.pdb' -o -name '*.ilk' -o -name '*.exp' \) -delete
-          tar -czf autosampler-windows-x64.tar.gz -C package .
-          tar -tzf autosampler-windows-x64.tar.gz
 
-      - name: Upload artifact
+      - name: Upload executable
         uses: actions/upload-artifact@v7
         with:
-          name: autosampler-windows-x64
-          path: autosampler-windows-x64.tar.gz
+          path: "build/JuceAutosampler_artefacts/Release/JUCE Autosampler.exe"
           if-no-files-found: error
           retention-days: 30
-          compression-level: 0
+          archive: false
