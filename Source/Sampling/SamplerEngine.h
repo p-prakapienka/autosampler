@@ -17,7 +17,7 @@ public:
     using CompletionCallback = std::function<void(const std::map<int, SampleData>& samples)>;
 
     void startSampling(int startNote, int endNote, double noteDuration,
-                       int midiChannel, int velocity);
+                       double releaseDuration, int midiChannel, int velocity);
     void stopSampling();
 
     void setStatusCallback(StatusCallback callback) { statusCallback = std::move(callback); }
@@ -39,12 +39,14 @@ private:
     int endNote = 127;
     int currentNote = 0;
     double noteDuration = 3.0;
+    double releaseDuration = 1.0;
     int midiChannel = 1;
     int velocity = 100;
 
-    enum class NotePhase { SendingNoteOn, Recording, SendingNoteOff, Storing };
+    enum class NotePhase { SendingNoteOn, Recording, Releasing, Storing };
     NotePhase currentPhase = NotePhase::SendingNoteOn;
     double recordingElapsed = 0.0;
+    double releaseElapsed = 0.0;
 
     std::map<int, SampleData> collectedSamples;
     StatusCallback statusCallback;

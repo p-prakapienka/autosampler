@@ -11,7 +11,7 @@ SamplerEngine::~SamplerEngine()
 }
 
 void SamplerEngine::startSampling(int start, int end, double duration,
-                                   int channel, int vel)
+                                   double release, int channel, int vel)
 {
     if (sampling) {
         stopSampling();
@@ -20,11 +20,13 @@ void SamplerEngine::startSampling(int start, int end, double duration,
     startNote = start;
     endNote = end;
     noteDuration = duration;
+    releaseDuration = release;
     midiChannel = channel;
     velocity = vel;
     currentNote = startNote;
     currentPhase = NotePhase::SendingNoteOn;
     recordingElapsed = 0.0;
+    releaseElapsed = 0.0;
     collectedSamples.clear();
     sampling = true;
 
@@ -60,7 +62,7 @@ void SamplerEngine::timerCallback()
             recordingManager.prepareToRecord(
                 recordingManager.getCurrentSampleRate(),
                 recordingManager.getCurrentNumChannels(),
-                noteDuration + 0.5);
+                noteDuration + releaseDuration + 0.5);
             recordingManager.startRecording();
             midiOutputManager.sendNoteOn(midiChannel, currentNote, velocity);
             recordingElapsed = 0.0;
@@ -79,16 +81,28 @@ void SamplerEngine::timerCallback()
         {
             recordingElapsed += timerIntervalMs / 1000.0;
             if (recordingElapsed >= noteDuration) {
-                currentPhase = NotePhase::SendingNoteOff;
+                midiOutputManager.sendNoteOff(midiChannel, currentNote);
+                releaseElapsed = 0.0;
+                currentPhase = NotePhase::Releasing;
             }
             break;
         }
 
-        case NotePhase::SendingNoteOff:
+        case NotePhase::Releasing:
         {
-            midiOutputManager.sendNoteOff(midiChannel, currentNote);
-            recordingManager.stopRecording();
-            currentPhase = NotePhase::Storing;
+            releaseElapsed += timerIntervalMs / 1000.0;
+            if (releaseElapsed >= releaseDuration) {
+                recordingManager.stopRecording();
+                currentPhase = NotePhase::Storing;
+                break;
+            }
+
+            if (statusCallback && releaseElapsed <= timerIntervalMs / 1000.0) {
+                auto noteName = getMidiNoteDisplayName(currentNote);
+                auto status = "Releasing " + noteName + " (" +
+                              juce::String(currentNote) + ")";
+                statusCallback(status, currentNote - startNote, endNote - startNote + 1);
+            }
             break;
         }
 
